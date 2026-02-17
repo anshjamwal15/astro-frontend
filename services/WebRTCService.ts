@@ -34,7 +34,27 @@ export class WebRTCService {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      // Public TURN servers for better connectivity
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
     ],
+    iceCandidatePoolSize: 10,
   };
 
   private sessionConstraints = {
@@ -128,6 +148,12 @@ export class WebRTCService {
       this.sendIceCandidate(event.candidate);
     });
 
+    // ICE candidate error
+    (this.peerConnection as any).addEventListener('icecandidateerror', (event: any) => {
+      // Some candidate errors are normal and can be ignored
+      console.log('ICE candidate error (can be ignored):', event.errorCode);
+    });
+
     // ICE connection state change
     (this.peerConnection as any).addEventListener('iceconnectionstatechange', () => {
       const state = this.peerConnection?.iceConnectionState;
@@ -136,6 +162,8 @@ export class WebRTCService {
 
       if (state === 'connected' || state === 'completed') {
         console.log('Call connected successfully');
+      } else if (state === 'failed') {
+        console.error('ICE connection failed - may need TURN server');
       }
     });
 

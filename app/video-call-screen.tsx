@@ -24,6 +24,7 @@ export default function VideoCallScreen() {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('Initializing...');
   const [localStreamURL, setLocalStreamURL] = useState<string | null>(null);
   const [remoteStreamURL, setRemoteStreamURL] = useState<string | null>(null);
 
@@ -37,24 +38,76 @@ export default function VideoCallScreen() {
 
   const initializeCall = async () => {
     try {
+      setConnectionStatus(isHost ? 'Creating room...' : 'Joining room...');
+
       // Setup callbacks
       webRTCService.onLocalStream = (stream) => {
+        console.log('Local stream received');
         setLocalStreamURL(stream.toURL());
+        setConnectionStatus(isHost ? 'Waiting for guest...' : 'Connecting...');
       };
 
       webRTCService.onRemoteStream = (stream) => {
+        console.log('Remote stream received, URL:', stream.toURL());
         setRemoteStreamURL(stream.toURL());
+        setConnectionStatus('Connected');
       };
 
       webRTCService.onConnectionStateChange = (state) => {
-        console.log('Connection state:', state);
+        console.log('Connection state changed:', state);
+        
+        switch (state) {
+          case 'connecting':
+            setConnectionStatus('Connecting...');
+            break;
+          case 'connected':
+            setConnectionStatus('Connected');
+            setIsConnected(true);
+            break;
+          case 'disconnected':
+            setConnectionStatus('Disconnected');
+            setIsConnected(false);
+            break;
+          case 'failed':
+            setConnectionStatus('Connection failed');
+            setIsConnected(false);
+            Alert.alert(
+              'Connection Failed',
+              'Unable to establish connection. Please check your internet and try again.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => router.back(),
+                },
+              ]
+            );
+            break;
+          case 'closed':
+            setConnectionStatus('Call ended');
+            break;
+        }
       };
 
       webRTCService.onIceConnectionStateChange = (state) => {
-        if (state === 'connected' || state === 'completed') {
-          setIsConnected(true);
-        } else if (state === 'disconnected' || state === 'failed') {
-          setIsConnected(false);
+        console.log('ICE connection state changed:', state);
+        
+        switch (state) {
+          case 'checking':
+            setConnectionStatus('Establishing connection...');
+            break;
+          case 'connected':
+          case 'completed':
+            setConnectionStatus('Connected');
+            setIsConnected(true);
+            break;
+          case 'disconnected':
+            setConnectionStatus('Connection lost');
+            setIsConnected(false);
+            break;
+          case 'failed':
+            setConnectionStatus('Connection failed');
+            setIsConnected(false);
+            break;
         }
       };
 
@@ -131,10 +184,19 @@ export default function VideoCallScreen() {
           />
         ) : (
           <View style={styles.videoPlaceholder}>
-            <Ionicons name="person" size={80} color="#666" />
+            <Ionicons 
+              name={isConnected ? "person" : "videocam"} 
+              size={80} 
+              color="#666" 
+            />
             <Text style={styles.placeholderText}>
-              {isHost ? 'Waiting for others to join...' : isConnected ? 'Connected to room' : 'Connecting...'}
+              {connectionStatus}
             </Text>
+            {!isConnected && (
+              <Text style={styles.placeholderSubtext}>
+                {isHost ? 'Share room name with others to join' : 'Waiting for host...'}
+              </Text>
+            )}
           </View>
         )}
       </View>
@@ -219,9 +281,7 @@ export default function VideoCallScreen() {
       {/* Status Messages */}
       {!isConnected && (
         <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>
-            {isHost ? 'Creating room...' : 'Joining room...'}
-          </Text>
+          <Text style={styles.statusText}>{connectionStatus}</Text>
         </View>
       )}
     </View>
@@ -252,6 +312,14 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 16,
     marginTop: 16,
+    textAlign: 'center',
+  },
+  placeholderSubtext: {
+    color: '#888',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 40,
   },
   connectingContainer: {
     justifyContent: 'center',
