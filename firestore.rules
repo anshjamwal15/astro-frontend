@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read/write access to rooms for WebRTC
+    match /rooms/{roomId} {
+      allow read, write: if true;
+      
+      match /hostCandidates/{candidateId} {
+        allow read, write: if true;
+      }
+      
+      match /guestCandidates/{candidateId} {
+        allow read, write: if true;
+      }
+    }
+    
+    // Allow read/write access to video and audio rooms
+    match /video_rooms/{roomId} {
+      allow read, write: if true;
+      
+      match /callerCandidates/{candidateId} {
+        allow read, write: if true;
+      }
+      
+      match /calleeCandidates/{candidateId} {
+        allow read, write: if true;
+      }
+    }
+    
+    match /audio_rooms/{roomId} {
+      allow read, write: if true;
+      
+      match /callerCandidates/{candidateId} {
+        allow read, write: if true;
+      }
+      
+      match /calleeCandidates/{candidateId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}

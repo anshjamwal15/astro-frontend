@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "563065754732",
+    "project_id": "mindaro-astrology-app",
+    "storage_bucket": "mindaro-astrology-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:563065754732:android:9ebc0d8f23d605c94c7449",
+        "android_client_info": {
+          "package_name": "com.dekhokaun.advijr"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "563065754732-2vj63c39cohsbaol45242qc4mkmh49ds.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dekhokaun.advijr",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "563065754732-guchje5lsuee67524qp10fg0i711onns.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCtkS8Df2FDgVQ8Av5BZHsbDrZr7TfUfI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "563065754732-guchje5lsuee67524qp10fg0i711onns.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "563065754732-8scdplo53bqqmka9t8gilprit4hqjfjq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.astrologyApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
