@@ -9,10 +9,15 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Image,
+  ActionSheetIOS,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser } from '../../contexts/UserContext';
 import { ApiService } from '../../services/apiService';
 
@@ -35,6 +40,12 @@ export default function ProfileTab() {
     signOut: false,
     delete: false,
   });
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Load profile image from local storage
+  useEffect(() => {
+    loadProfileImage();
+  }, []);
 
   // Update form data when user data changes
   useEffect(() => {
@@ -56,6 +67,123 @@ export default function ProfileTab() {
     }
   }, [user]);
 
+  const loadProfileImage = async () => {
+    try {
+      const savedImage = await AsyncStorage.getItem(`profile_image_${user?.id || user?.email}`);
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+    } catch (error) {
+      console.error('Error loading profile image:', error);
+    }
+  };
+
+  const saveProfileImage = async (imageUri: string) => {
+    try {
+      await AsyncStorage.setItem(`profile_image_${user?.id || user?.email}`, imageUri);
+      setProfileImage(imageUri);
+    } catch (error) {
+      console.error('Error saving profile image:', error);
+      Alert.alert('Error', 'Failed to save profile image');
+    }
+  };
+
+  const requestPermissions = async (type: 'camera' | 'gallery') => {
+    if (type === 'camera') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Camera permission is required to take photos');
+        return false;
+      }
+    } else {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Gallery permission is required to select photos');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const pickImageFromGallery = async () => {
+    const hasPermission = await requestPermissions('gallery');
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await saveProfileImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image from gallery:', error);
+      Alert.alert('Error', 'Failed to pick image from gallery');
+    }
+  };
+
+  const takePhotoWithCamera = async () => {
+    const hasPermission = await requestPermissions('camera');
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await saveProfileImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo with camera:', error);
+      Alert.alert('Error', 'Failed to take photo');
+    }
+  };
+
+  const handleProfileImagePress = () => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Take Photo', 'Choose from Gallery'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            takePhotoWithCamera();
+          } else if (buttonIndex === 2) {
+            pickImageFromGallery();
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        'Change Profile Picture',
+        'Choose an option',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Take Photo',
+            onPress: takePhotoWithCamera,
+          },
+          {
+            text: 'Choose from Gallery',
+            onPress: pickImageFromGallery,
+          },
+        ],
+        { cancelable: true }
+      );
+    }
+  };
+
   const handleSubmit = async () => {
     if (!user?.email) {
       Alert.alert('Error', 'User email not found. Please log in again.');
@@ -70,7 +198,7 @@ export default function ProfileTab() {
     setIsUpdating(true);
     try {
       console.log('Updating user profile with data:', formData);
-      
+
       // Prepare the update data
       const updateData = {
         email: user.email,
@@ -94,10 +222,10 @@ export default function ProfileTab() {
           profilePicture: response.data.profilePicture,
           profileCompleted: response.data.isProfileCompleted, // Map backend field name
         };
-        
+
         // Update user context with new data
         await updateUser(updatedUserData);
-        
+
         Alert.alert('Success', 'Profile updated successfully!');
         console.log('Profile updated successfully');
       } else {
@@ -123,7 +251,7 @@ export default function ProfileTab() {
           style: 'cancel',
           onPress: () => console.log('Sign out cancelled'),
         },
-        {
+        { 
           text: 'Sign Out',
           onPress: async () => {
             try {
@@ -163,7 +291,7 @@ export default function ProfileTab() {
             setIsDeleting(true);
             try {
               const response = await ApiService.deleteUser(user.id);
-              
+
               if (response.success) {
                 Alert.alert(
                   'Account Deleted',
@@ -203,17 +331,17 @@ export default function ProfileTab() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0052CC" />
-      
+
       {/* Blue Header */}
       <LinearGradient
         colors={['#0052CC', '#0066FF']}
         style={styles.header}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color="#E8F0FE" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
       </LinearGradient>
@@ -222,10 +350,16 @@ export default function ProfileTab() {
         {/* Profile Picture Section */}
         <View style={styles.profileSection}>
           <View style={styles.profileImageContainer}>
-            <View style={styles.profileImage}>
-              <Ionicons name="person" size={50} color="#333" />
-            </View>
-            <TouchableOpacity style={styles.editIcon}>
+            <TouchableOpacity onPress={handleProfileImagePress} activeOpacity={0.8}>
+              <View style={styles.profileImage}>
+                {profileImage ? (
+                  <Image source={{ uri: profileImage }} style={styles.profileImagePhoto} />
+                ) : (
+                  <Ionicons name="person" size={50} color="#333" />
+                )}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.editIcon} onPress={handleProfileImagePress}>
               <Ionicons name="camera" size={16} color="#666" />
             </TouchableOpacity>
           </View>
@@ -252,7 +386,7 @@ export default function ProfileTab() {
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Gender</Text>
             <View style={styles.genderContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
                   styles.genderOption,
                   formData.gender === 'Male' && styles.genderSelected
@@ -265,8 +399,8 @@ export default function ProfileTab() {
                 ]} />
                 <Text style={styles.genderText}>Male</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[
                   styles.genderOption,
                   formData.gender === 'Female' && styles.genderSelected
@@ -339,13 +473,13 @@ export default function ProfileTab() {
           </View>
 
           {/* Update Profile Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.glassButton, 
-              styles.updateButton, 
+              styles.glassButton,
+              styles.updateButton,
               isUpdating && styles.buttonDisabled,
               buttonStates.update && styles.buttonPressed
-            ]} 
+            ]}
             onPress={handleSubmit}
             onPressIn={() => handleButtonPress('update', true)}
             onPressOut={() => handleButtonPress('update', false)}
@@ -370,12 +504,12 @@ export default function ProfileTab() {
           </TouchableOpacity>
 
           {/* Sign Out Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.glassButton, 
+              styles.glassButton,
               styles.signOutButton,
               buttonStates.signOut && styles.buttonPressed
-            ]} 
+            ]}
             onPress={handleSignOut}
             onPressIn={() => handleButtonPress('signOut', true)}
             onPressOut={() => handleButtonPress('signOut', false)}
@@ -393,13 +527,13 @@ export default function ProfileTab() {
           </TouchableOpacity>
 
           {/* Delete Account Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.glassButton, 
-              styles.deleteButton, 
+              styles.glassButton,
+              styles.deleteButton,
               isDeleting && styles.buttonDisabled,
               buttonStates.delete && styles.buttonPressed
-            ]} 
+            ]}
             onPress={handleDeleteUser}
             onPressIn={() => handleButtonPress('delete', true)}
             onPressOut={() => handleButtonPress('delete', false)}
@@ -446,7 +580,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: '#E8F0FE',
     flex: 1,
   },
   content: {
@@ -469,6 +603,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF8C42',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  profileImagePhoto: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 60,
   },
   editIcon: {
     position: 'absolute',
@@ -560,7 +700,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  
+
   // Glassmorphism Button Styles
   glassButton: {
     borderRadius: 25,
@@ -579,7 +719,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  
+
   buttonGradient: {
     paddingVertical: 16,
     paddingHorizontal: 20,
@@ -588,14 +728,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 50,
   },
-  
+
   buttonPressed: {
     transform: [{ scale: 0.98 }],
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
-  
+
   buttonText: {
     fontSize: 16,
     color: '#FFFFFF',
@@ -604,27 +744,27 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  
+
   buttonIcon: {
     marginRight: 10,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  
+
   updateButton: {
     marginTop: 25,
   },
-  
+
   signOutButton: {
     // Orange gradient colors defined in component
   },
-  
+
   deleteButton: {
     marginBottom: 30,
     // Red gradient colors defined in component
   },
-  
+
   buttonDisabled: {
     opacity: 0.6,
     transform: [{ scale: 1 }],

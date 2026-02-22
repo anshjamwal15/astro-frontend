@@ -179,9 +179,6 @@ export default function SignUpScreen() {
         colors={['#0052CC', '#0066FF']}
         style={styles.header}
       >
-        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
       </LinearGradient>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -288,7 +285,6 @@ export default function SignUpScreen() {
               keyboardType="numeric"
               maxLength={10}
             />
-            <Text style={styles.helperText}>We'll calculate your zodiac sign automatically ✨</Text>
             {formData.dateOfBirth && !isValidDate(formData.dateOfBirth) && (
               <Text style={styles.errorText}>Please enter a valid date (YYYY-MM-DD)</Text>
             )}
@@ -344,23 +340,6 @@ export default function SignUpScreen() {
             ) : (
               <Text style={styles.createAccountButtonText}>CREATE ACCOUNT</Text>
             )}
-          </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity 
-            style={styles.truecallerButton}
-            onPress={handleTruecallerSignUp}
-            disabled={loading}
-          >
-            <View style={styles.truecallerIcon}>
-              <Text style={styles.truecallerIconText}>📞</Text>
-            </View>
-            <Text style={styles.truecallerText}>Continue with Truecaller</Text>
           </TouchableOpacity>
 
           <View style={styles.termsContainer}>

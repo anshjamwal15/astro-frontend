@@ -21,6 +21,7 @@ export default function MentorSignInScreen() {
     password: '',
   });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { setMentor } = useMentor();
 
   const handleSignIn = async () => {
@@ -127,20 +128,29 @@ export default function MentorSignInScreen() {
           {/* Password */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Password *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.password}
-              onChangeText={(text) => updateFormData('password', text)}
-              placeholder="Enter your password"
-              placeholderTextColor="#999"
-              secureTextEntry
-            />
+            <View style={styles.passwordWrapper}>
+              <TextInput
+                style={styles.textInput}
+                value={formData.password}
+                onChangeText={(text) => updateFormData('password', text)}
+                placeholder="Enter your password"
+                placeholderTextColor="#999"
+                secureTextEntry={!showPassword}
+              />
+              <TouchableOpacity 
+                style={styles.eyeIcon}
+                onPress={() => setShowPassword(!showPassword)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Forgot Password */}
-          <TouchableOpacity style={styles.forgotPassword}>
+          {/* <TouchableOpacity style={styles.forgotPassword}>
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           {/* Sign In Button */}
           <TouchableOpacity 
@@ -164,22 +174,13 @@ export default function MentorSignInScreen() {
           </View>
 
           {/* Test Credentials Info */}
-          <View style={styles.testInfoContainer}>
+          {/* <View style={styles.testInfoContainer}>
             <Text style={styles.testInfoTitle}>Test Mentor Credentials:</Text>
             <Text style={styles.testInfoText}>rajesh.sharma@mindaro.com / password123</Text>
             <Text style={styles.testInfoText}>priya.gupta@mindaro.com / password123</Text>
             <Text style={styles.testInfoText}>mentor@test.com / password123</Text>
             <Text style={styles.testInfoNote}>Use any email/password combination for demo</Text>
-          </View>
-
-          {/* Info Section */}
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoTitle}>Mentor Benefits:</Text>
-            <Text style={styles.infoText}>• Manage your consultation schedule</Text>
-            <Text style={styles.infoText}>• Connect with clients via video/audio calls</Text>
-            <Text style={styles.infoText}>• Track your earnings and ratings</Text>
-            <Text style={styles.infoText}>• Access mentor-only features</Text>
-          </View>
+          </View> */}
         </View>
       </ScrollView>
     </View>
@@ -277,6 +278,18 @@ const styles = StyleSheet.create({
     color: '#333',
     borderWidth: 1,
     borderColor: '#E0E0E0',
+  },
+  passwordWrapper: {
+    position: 'relative',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 20,
+    top: 15,
+    padding: 5,
+  },
+  eyeIconText: {
+    fontSize: 20,
   },
   textInputError: {
     borderColor: '#FF6B6B',

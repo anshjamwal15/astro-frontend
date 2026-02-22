@@ -40,6 +40,7 @@ export default function MentorsScreen() {
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [filteredMentors, setFilteredMentors] = useState<Mentor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const { user } = useUser();
   const filters = ['All', 'NEW!', 'Love', 'Career'];
 
@@ -241,10 +242,17 @@ export default function MentorsScreen() {
               <View key={mentor.id} style={styles.astrologerCard}>
                 <View style={styles.astrologerInfo}>
                   <View style={styles.astrologerImageContainer}>
-                    <Image 
-                      source={{ uri: mentor.photo }}
-                      style={styles.astrologerImage}
-                    />
+                    {imageErrors.has(mentor.id) ? (
+                      <View style={[styles.astrologerImage, styles.fallbackIconContainer]}>
+                        <Ionicons name="person" size={36} color="#999" />
+                      </View>
+                    ) : (
+                      <Image 
+                        source={{ uri: mentor.photo }}
+                        style={styles.astrologerImage}
+                        onError={() => setImageErrors(prev => new Set(prev).add(mentor.id))}
+                      />
+                    )}
                     {mentor.isOnline && <View style={styles.onlineIndicator} />}
                   </View>
                   
@@ -416,6 +424,11 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
+  },
+  fallbackIconContainer: {
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   onlineIndicator: {
     position: 'absolute',

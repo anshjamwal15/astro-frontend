@@ -21,6 +21,7 @@ export default function SignInScreen() {
     password: '',
   });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { setUser } = useUser();
 
   const handleSignIn = async () => {
@@ -115,9 +116,6 @@ export default function SignInScreen() {
         colors={['#0052CC', '#0066FF']}
         style={styles.header}
       >
-        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
       </LinearGradient>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -159,20 +157,29 @@ export default function SignInScreen() {
           {/* Password */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Password *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={formData.password}
-              onChangeText={(text) => updateFormData('password', text)}
-              placeholder="Enter your password"
-              placeholderTextColor="#999"
-              secureTextEntry
-            />
+            <View style={styles.passwordWrapper}>
+              <TextInput
+                style={styles.textInput}
+                value={formData.password}
+                onChangeText={(text) => updateFormData('password', text)}
+                placeholder="Enter your password"
+                placeholderTextColor="#999"
+                secureTextEntry={!showPassword}
+              />
+              <TouchableOpacity 
+                style={styles.eyeIcon}
+                onPress={() => setShowPassword(!showPassword)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Forgot Password */}
-          <TouchableOpacity style={styles.forgotPassword}>
+          {/* <TouchableOpacity style={styles.forgotPassword}>
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           {/* Sign In Button */}
           <TouchableOpacity 
@@ -202,7 +209,7 @@ export default function SignInScreen() {
             </View>
           </TouchableOpacity>
 
-          <View style={styles.divider}>
+          {/* <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>or</Text>
             <View style={styles.dividerLine} />
@@ -217,7 +224,7 @@ export default function SignInScreen() {
               <Text style={styles.truecallerIconText}>📞</Text>
             </View>
             <Text style={styles.truecallerText}>Continue with Truecaller</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <View style={styles.termsContainer}>
             <Text style={styles.termsText}>
@@ -236,13 +243,13 @@ export default function SignInScreen() {
           </View>
 
           {/* Test Credentials Info */}
-          <View style={styles.testInfoContainer}>
+          {/* <View style={styles.testInfoContainer}>
             <Text style={styles.testInfoTitle}>Test Credentials:</Text>
             <Text style={styles.testInfoText}>john@example.com / password123</Text>
             <Text style={styles.testInfoText}>jane@example.com / password123</Text>
             <Text style={styles.testInfoText}>admin@example.com / admin123</Text>
             <Text style={styles.testInfoNote}>Any email/password combination works for demo</Text>
-          </View>
+          </View> */}
         </View>
       </ScrollView>
     </View>
@@ -342,6 +349,18 @@ const styles = StyleSheet.create({
     color: '#333',
     borderWidth: 1,
     borderColor: '#E0E0E0',
+  },
+  passwordWrapper: {
+    position: 'relative',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 20,
+    top: 15,
+    padding: 5,
+  },
+  eyeIconText: {
+    fontSize: 20,
   },
   textInputError: {
     borderColor: '#FF6B6B',

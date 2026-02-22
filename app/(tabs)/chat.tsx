@@ -25,6 +25,7 @@ interface ChatRoom {
   lastMessageTime: string;
   unreadCount: number;
   isOnline: boolean;
+  imageError?: boolean;
 }
 
 export default function ChatScreen() {
@@ -107,6 +108,14 @@ export default function ChatScreen() {
         isOnline: chat.isOnline.toString(),
       }
     });
+  };
+
+  const handleImageError = (chatId: string) => {
+    setChatRooms(prevRooms => 
+      prevRooms.map(room => 
+        room.id === chatId ? { ...room, imageError: true } : room
+      )
+    );
   };
 
   const formatTime = (dateString: string) => {
@@ -194,10 +203,17 @@ export default function ChatScreen() {
               activeOpacity={0.7}
             >
               <View style={styles.avatarContainer}>
-                <Image 
-                  source={{ uri: chat.mentorPhoto }}
-                  style={styles.avatar}
-                />
+                {chat.imageError ? (
+                  <View style={styles.avatarFallback}>
+                    <Ionicons name="person" size={32} color="#666" />
+                  </View>
+                ) : (
+                  <Image 
+                    source={{ uri: chat.mentorPhoto }}
+                    style={styles.avatar}
+                    onError={() => handleImageError(chat.id)}
+                  />
+                )}
                 {chat.isOnline && <View style={styles.onlineIndicator} />}
               </View>
               
@@ -331,6 +347,14 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
+  },
+  avatarFallback: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   onlineIndicator: {
     position: 'absolute',

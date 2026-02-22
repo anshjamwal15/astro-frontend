@@ -53,9 +53,9 @@ export default function HomeScreen() {
 
   const services = [
     { id: 1, title: 'Buisness\nHelp', icon: 'sunny', keywords: ['horoscope', 'daily', 'astrology', 'prediction'] },
-    { id: 2, title: 'Free\nKundli', icon: 'analytics', keywords: ['kundli', 'birth chart', 'free', 'astrology'] },
-    { id: 3, title: 'Kundli\nMatching', icon: 'heart', keywords: ['matching', 'compatibility', 'marriage', 'kundli'] },
-    { id: 4, title: 'Free\nChat', icon: 'chatbubbles', keywords: ['chat', 'free', 'talk', 'astrologer'] },
+    { id: 2, title: 'Marrige\nHelp', icon: 'analytics', keywords: ['kundli', 'birth chart', 'free', 'astrology'] },
+    { id: 3, title: 'Study\nConsultaion', icon: 'heart', keywords: ['matching', 'compatibility', 'marriage', 'kundli'] },
+    { id: 4, title: 'Women\nHealth', icon: 'chatbubbles', keywords: ['chat', 'free', 'talk', 'astrologer'] },
   ];
 
   useEffect(() => {
@@ -77,13 +77,15 @@ export default function HomeScreen() {
   }, [searchQuery]);
 
   const handleServicePress = (service: any) => {
-    if (service.title.includes('Chat')) {
-      router.push('/(tabs)/chat');
-    } else if (service.title.includes('Kundli')) {
-      Alert.alert('Coming Soon', 'This feature will be available soon!');
-    } else if (service.title.includes('Horoscope')) {
-      router.push('/(tabs)/horoscope');
-    }
+    // if (service.title.includes('Buisness\nHelp')) {
+      router.push('/(tabs)/mentors');
+    // } 
+
+    // } else if (service.title.includes('Kundli')) {
+    //   Alert.alert('Coming Soon', 'This feature will be available soon!');
+    // } else if (service.title.includes('Horoscope')) {
+    //   router.push('/(tabs)/mentors');
+    // }
   };
 
   const handleVideoCall = (astrologer?: any) => {
@@ -103,7 +105,7 @@ export default function HomeScreen() {
           astrologerId: astrologer.id.toString(),
           astrologerName: astrologer.name,
           astrologerImage: 'https://via.placeholder.com/60x60/4A90E2/FFFFFF?text=' + astrologer.name.charAt(0),
-          isOnline: astrologer.isOnline.toString()
+          isOnline: astrologer.isOnline ?? false
         }
       });
     } else {
@@ -130,7 +132,7 @@ export default function HomeScreen() {
             style={styles.profileButton}
             onPress={() => router.push('/(tabs)/profile')}
           >
-            <Ionicons name="person" size={20} color="#333" />
+            <Ionicons name="person" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
         
@@ -177,34 +179,23 @@ export default function HomeScreen() {
           </View>
           
         </View>
-
-        {/* Promotional Banner */}
-        <View style={styles.bannerContainer}>
-          <LinearGradient
-            colors={['#0052CC', '#0066FF']}
-            style={styles.banner}
-          >
-            <Text style={styles.bannerTitle}>Get Your First Reading</Text>
-            <Text style={styles.bannerSubtitle}>FREE for new users!</Text>
-            <TouchableOpacity style={styles.bannerButton}>
-              <Text style={styles.bannerButtonText}>Claim Now</Text>
-            </TouchableOpacity>
-          </LinearGradient>
-        </View>
-
         {/* Top Astrologers */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Top Astrologers</Text>
-            <TouchableOpacity>
+            <Text style={styles.sectionTitle}>Top Mentors</Text>
+            {/* <TouchableOpacity>
               <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
           
           {loading ? (
             <ActivityIndicator size="large" color="#0052CC" style={styles.loader} />
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.astrologerScrollContent}
+            >
               {astrologers.map((astrologer, index) => (
                 <TouchableOpacity
                   key={`astrologer-${astrologer.id}-${index}`}
@@ -212,28 +203,43 @@ export default function HomeScreen() {
                   onPress={() => handleConsultation(astrologer)}
                 >
                   <View style={styles.astrologerImageContainer}>
-                    <Image source={astrologer.image} style={styles.astrologerImage} />
+                    {astrologer.image ? (
+                      <Image 
+                        source={astrologer.image} 
+                        style={styles.astrologerImage}
+                        onError={() => {
+                          // Fallback handled by conditional rendering
+                        }}
+                      />
+                    ) : (
+                      <View style={styles.astrologerImagePlaceholder}>
+                        <Ionicons name="person" size={32} color="#0052CC" />
+                      </View>
+                    )}
                     {astrologer.isOnline && <View style={styles.onlineIndicator} />}
                   </View>
-                  <Text style={styles.astrologerName}>{astrologer.name}</Text>
+                  <Text style={styles.astrologerName} numberOfLines={1}>{astrologer.name}</Text>
                   <View style={styles.ratingContainer}>
-                    <Text style={styles.ratingText}>⭐ {astrologer.rating}</Text>
+                    <Ionicons name="star" size={12} color="#FFB800" />
+                    <Text style={styles.ratingText}>{astrologer.rating}</Text>
                   </View>
                   <Text style={styles.priceText}>{astrologer.price}</Text>
-                  <TouchableOpacity 
-                    style={styles.consultButton}
-                    onPress={() => handleConsultation(astrologer)}
-                  >
-                    <Text style={styles.consultButtonText}>Chat</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.videoCallButton}
-                    onPress={() => handleVideoCall(astrologer)}
-                  >
-                    <Ionicons name="videocam" size={12} color="#FFFFFF" />
-                    <Text style={styles.videoCallButtonText}>Video</Text>
-                  </TouchableOpacity>
+                  <View style={styles.buttonRow}>
+                    <TouchableOpacity 
+                      style={styles.consultButton}
+                      onPress={() => handleConsultation(astrologer)}
+                    >
+                      <Ionicons name="chatbubble-ellipses" size={14} color="#FFFFFF" />
+                      <Text style={styles.consultButtonText}>Chat</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.videoCallButton}
+                      onPress={() => handleVideoCall(astrologer)}
+                    >
+                      <Ionicons name="videocam" size={14} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -247,7 +253,7 @@ export default function HomeScreen() {
             onPress={() => router.push('/(tabs)/call')}
           >
             <Ionicons name="call" size={24} color="#333" />
-            <Text style={styles.actionButtonText}>Call an Astrologer</Text>
+            <Text style={styles.actionButtonText}>Call an Mentor</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -293,11 +299,11 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#333',
+    color: '#FFFFFF',
   },
   subGreeting: {
     fontSize: 16,
-    color: '#666',
+    color: '#E8F0FE',
     marginTop: 4,
   },
   statusText: {
@@ -347,6 +353,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#333',
+    paddingBottom: 10,
   },
   viewAllText: {
     fontSize: 14,
@@ -390,12 +397,12 @@ const styles = StyleSheet.create({
   bannerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: '#FFFFFF',
     marginBottom: 5,
   },
   bannerSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: '#E8F0FE',
     marginBottom: 15,
   },
   bannerButton: {
@@ -412,80 +419,109 @@ const styles = StyleSheet.create({
   loader: {
     marginVertical: 20,
   },
+  astrologerScrollContent: {
+    paddingRight: 20,
+  },
   astrologerCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    padding: 15,
-    marginRight: 15,
-    width: 150,
+    borderRadius: 16,
+    padding: 12,
+    marginRight: 12,
+    width: 140,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
   astrologerImageContainer: {
     position: 'relative',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   astrologerImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: '#0052CC',
+  },
+  astrologerImagePlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E8F0FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#0052CC',
   },
   onlineIndicator: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: '#4CAF50',
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
   astrologerName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 5,
+    marginBottom: 4,
     textAlign: 'center',
   },
   ratingContainer: {
-    marginBottom: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 3,
   },
   ratingText: {
     fontSize: 12,
     color: '#666',
+    fontWeight: '500',
   },
   priceText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#FF8C42',
-    fontWeight: '600',
-    marginBottom: 10,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    width: '100%',
   },
   consultButton: {
+    flex: 1,
     backgroundColor: '#0052CC',
-    paddingHorizontal: 15,
     paddingVertical: 8,
-    borderRadius: 15,
-    marginBottom: 5,
-  },
-  consultButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
-  },
-  videoCallButton: {
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
+    paddingHorizontal: 8,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+  },
+  consultButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  videoCallButton: {
+    backgroundColor: '#FF6B6B',
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   videoCallButtonText: {
     fontSize: 11,

@@ -31,7 +31,7 @@ export const AUTH_CONFIG = {
 
   // Backend API Configuration
   API: {
-    BASE_URL: "http://192.168.0.105:3000", // Dynamic URL with Expo auto-detection
+    BASE_URL: "http://3.108.112.130:3000",
     ENDPOINTS: {
       REGISTER: '/api/user/register',
       LOGIN: '/api/user/login',

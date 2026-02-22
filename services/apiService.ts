@@ -51,6 +51,11 @@ export interface MentorData {
   experience?: number;
   rating?: number;
   isAvailable?: boolean;
+  photo?: string;
+  languages?: string;
+  price?: number;
+  originalPrice?: number;
+  ratingCount?: number;
 }
 
 export interface MessageData {

@@ -76,21 +76,12 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="horoscope"
-        options={{
-          title: 'Horoscope',
-          tabBarIcon: ({ focused }) => (
-            <Ionicons 
-              name={focused ? "star" : "star-outline"} 
-              size={24} 
-              color={focused ? '#333333' : '#999999'} 
-            />
-          ),
-        }}
-      />
       
       {/* Hidden screens - accessible via navigation but not in tab bar */}
+      <Tabs.Screen
+        name="horoscope"
+        options={{ href: null }}
+      />
       <Tabs.Screen
         name="index"
         options={{ href: null }}
