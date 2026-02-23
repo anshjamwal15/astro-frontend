@@ -18,6 +18,8 @@ export interface User {
 interface UserContextType {
   user: User | null;
   setUser: (user: User | null) => void;
+  jwtToken: string | null;
+  setJwtToken: (token: string | null) => void;
   isLoading: boolean;
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => Promise<void>;
@@ -27,22 +29,40 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUserState] = useState<User | null>(null);
+  const [jwtToken, setJwtTokenState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user data from storage on app start
+  // Load user data and JWT token from storage on app start
   useEffect(() => {
     loadUserFromStorage();
   }, []);
 
   const loadUserFromStorage = async () => {
     try {
-      const userData = await AsyncStorage.getItem('user');
+      console.log('🔄 Loading user data from storage...');
+      const [userData, token] = await Promise.all([
+        AsyncStorage.getItem('user'),
+        AsyncStorage.getItem('jwt_token')
+      ]);
+      
       if (userData) {
+        console.log('✅ User data loaded from storage');
         setUserState(JSON.parse(userData));
+      } else {
+        console.log('⚠️ No user data in storage');
+      }
+      
+      if (token) {
+        console.log('✅ JWT token loaded from storage');
+        console.log('🔑 Token preview:', token.substring(0, 50) + '...');
+        setJwtTokenState(token);
+      } else {
+        console.log('⚠️ No JWT token in storage');
       }
     } catch (error) {
-      console.error('Error loading user from storage:', error);
+      console.error('❌ Error loading user from storage:', error);
     } finally {
+      console.log('✅ UserContext loading complete');
       setIsLoading(false);
     }
   };
@@ -61,6 +81,24 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const setJwtToken = async (token: string | null) => {
+    try {
+      if (token) {
+        console.log('💾 Saving JWT token to storage...');
+        await AsyncStorage.setItem('jwt_token', token);
+        setJwtTokenState(token);
+        console.log('✅ JWT token saved successfully');
+      } else {
+        console.log('🗑️ Removing JWT token from storage...');
+        await AsyncStorage.removeItem('jwt_token');
+        setJwtTokenState(null);
+        console.log('✅ JWT token removed successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error saving JWT token to storage:', error);
+    }
+  };
+
   const updateUser = async (userData: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...userData };
@@ -70,8 +108,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await AsyncStorage.multiRemove(['user', 'authToken']);
+      await AsyncStorage.multiRemove(['user', 'jwt_token', 'authToken']);
       setUserState(null);
+      setJwtTokenState(null);
     } catch (error) {
       console.error('Error during logout:', error);
     }
@@ -80,6 +119,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value: UserContextType = {
     user,
     setUser,
+    jwtToken,
+    setJwtToken,
     isLoading,
     logout,
     updateUser,

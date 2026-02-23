@@ -213,12 +213,9 @@ export class AuthService {
       });
       
       const requestBody = {
-        name: 'LoginUser', // Backend requires this but it's not used for login
         email: email,
-        mobile: '1234567890', // Backend requires this but it's not used for login
-        country: 'India', // Backend requires this but it's not used for login
         password: password,
-        method: 'email', // Backend requires this field
+        method: 'password', // Use 'password' as per API doc
       };
 
       console.log('Login request body:', requestBody);
@@ -239,9 +236,6 @@ export class AuthService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          // Use API keys for user control
-          'X-API-Key': AUTH_CONFIG.API.API_KEY,
-          'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
         },
         body: JSON.stringify(requestBody),
       });
@@ -250,7 +244,6 @@ export class AuthService {
 
       console.log('Fetch completed. Response status:', response.status);
       console.log('Response ok:', response.ok);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       // Parse response data
       let data;
@@ -275,57 +268,10 @@ export class AuthService {
         console.log('Response status:', response.status);
         
         // Handle different HTTP status codes
-        if (response.status === 400) {
-          console.log('400 Error response data:', data);
-          
-          if (data.message && data.message.toLowerCase().includes('invalid password')) {
-            throw new Error('Incorrect password. Please check your password and try again.');
-          } else if (data.message && data.message.toLowerCase().includes('user not found')) {
-            // Instead of throwing error, try to register the user automatically
-            console.log('⚠️ User not found, attempting auto-registration...');
-            try {
-              const registrationData = {
-                name: this.extractNameFromEmail(email),
-                email: email,
-                mobile: '9876543210',
-                country: 'India',
-                password: password,
-                userType: 'CUSTOMER',
-              };
-              
-              const registerResult = await this.registerWithEmail(registrationData);
-              console.log('✅ Auto-registration successful:', registerResult);
-              
-              // Return the registered user data
-              return {
-                id: registerResult.id || Math.floor(Math.random() * 1000000),
-                name: registrationData.name,
-                email: registrationData.email,
-                mobile: registrationData.mobile,
-                country: registrationData.country,
-                userType: registrationData.userType,
-                profileCompleted: false,
-              };
-            } catch (regError: any) {
-              console.log('⚠️ Auto-registration failed, creating demo user...');
-              // If registration also fails, create a demo user
-              return {
-                id: Math.floor(Math.random() * 1000000),
-                name: this.extractNameFromEmail(email),
-                email: email,
-                mobile: '9876543210',
-                country: 'India',
-                userType: 'CUSTOMER',
-                profileCompleted: false,
-              };
-            }
-          } else if (data.message && data.message.toLowerCase().includes('email')) {
-            throw new Error('Invalid email address. Please check your email and try again.');
-          } else {
-            throw new Error(`${data.message || 'Login failed. Please check your credentials.'}`);
-          }
-        } else if (response.status === 401) {
-          throw new Error('Invalid email or password. Please check your credentials.');
+        if (response.status === 400 || response.status === 401) {
+          throw new Error(data.message || 'Invalid email or password');
+        } else if (response.status === 404) {
+          throw new Error('User not found. Please check your email or sign up.');
         } else if (response.status === 500) {
           throw new Error('Server error. Please try again later.');
         } else {
@@ -335,22 +281,30 @@ export class AuthService {
 
       console.log('Login successful, returning data');
       console.log('=== LOGIN ATTEMPT END ===');
-      return data;
+      
+      // Return data with snake_case to camelCase conversion
+      return {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        mobile: data.mobile,
+        country: data.country,
+        userType: data.user_type,
+        profileCompleted: data.is_profile_completed,
+        jwtToken: data.jwt_token,
+      };
     } catch (error: any) {
       console.error('=== LOGIN ERROR ===');
       console.error('Login error details:', error);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
       
       // Handle specific network errors
-      if (error.name === 'AbortError') {
+      if (error.name === 'AbortError' || error.message.includes('timeout')) {
         throw new Error('Request timeout. Please check your internet connection and try again.');
       } else if (error.message.includes('fetch') || error.message.includes('Network') || error.message.includes('Failed to fetch')) {
-        throw new Error(`Network error: Cannot connect to server at ${AUTH_CONFIG.API.BASE_URL}. Please check your connection.`);
+        throw new Error(`Network error: Cannot connect to server. Please check your connection.`);
       }
       
       // Re-throw our custom error messages
-      console.error('Re-throwing error');
       throw error;
     }
   }
@@ -362,6 +316,70 @@ export class AuthService {
     const username = email.split('@')[0];
     const parts = username.split(/[._-]/);
     return parts.map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+  }
+
+  // Token-based Sign In (Auto Login)
+  static async tokenSignIn(jwtToken: string): Promise<any> {
+    try {
+      console.log('=== TOKEN SIGNIN ATTEMPT START ===');
+      
+      const requestBody = {
+        jwt_token: jwtToken,
+      };
+
+      const tokenSigninUrl = `${AUTH_CONFIG.API.BASE_URL}${AUTH_CONFIG.API.ENDPOINTS.TOKEN_SIGNIN}`;
+      console.log('Token signin URL:', tokenSigninUrl);
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 10000);
+      });
+      
+      const fetchPromise = fetch(tokenSigninUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+      console.log('Token signin response status:', response.status);
+
+      const responseText = await response.text();
+      let data;
+      
+      if (responseText) {
+        data = JSON.parse(responseText);
+      } else {
+        data = {};
+      }
+
+      if (!response.ok) {
+        console.log('Token signin failed:', data);
+        throw new Error(data.message || 'Token validation failed');
+      }
+
+      console.log('Token signin successful');
+      console.log('=== TOKEN SIGNIN ATTEMPT END ===');
+      
+      // Return data with snake_case to camelCase conversion
+      return {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        mobile: data.mobile,
+        country: data.country,
+        userType: data.user_type,
+        profileCompleted: data.is_profile_completed,
+        jwtToken: data.jwt_token, // New refreshed token
+      };
+    } catch (error: any) {
+      console.error('=== TOKEN SIGNIN ERROR ===');
+      console.error('Token signin error:', error);
+      throw error;
+    }
   }
 
   // Email/Password Registration with backend
@@ -380,18 +398,15 @@ export class AuthService {
         name: userData.name,
         userType: userData.userType,
         baseUrl: AUTH_CONFIG.API.BASE_URL,
-        mockMode: AUTH_CONFIG.API.USE_MOCK_DATA
       });
 
       const requestBody = {
         name: userData.name,
         email: userData.email,
-        mobile: userData.mobile || '1234567890',
-        country: userData.country || 'India',
-        dateOfBirth: userData.dateOfBirth || '',
+        mobile: userData.mobile || '9876543210',
+        country: userData.country || 'IN',
         password: userData.password,
-        method: 'email', // Required by backend
-        userType: userData.userType || 'CUSTOMER', // Add userType support
+        method: 'password', // Use 'password' as per API doc
       };
 
       console.log('Registration request body:', requestBody);
@@ -401,30 +416,36 @@ export class AuthService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          // Use API keys for user control
-          'X-API-Key': AUTH_CONFIG.API.API_KEY,
-          'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
         },
         body: JSON.stringify(requestBody),
       });
 
       console.log('Registration response status:', response.status);
 
+      const responseText = await response.text();
+      let data;
+      
+      if (responseText) {
+        data = JSON.parse(responseText);
+        console.log('Registration response data:', data);
+      } else {
+        data = {};
+      }
+
       if (!response.ok) {
         // Handle different HTTP status codes
         if (response.status === 400) {
-          const errorData = await response.json().catch(() => ({ message: 'Invalid request' }));
-          console.log('Registration error response data:', errorData);
-          
-          if (errorData.message && errorData.message.toLowerCase().includes('already exists')) {
+          if (data.message && data.message.toLowerCase().includes('already exists')) {
             throw new Error('An account with this email already exists. Please sign in instead.');
-          } else if (errorData.message && errorData.message.toLowerCase().includes('invalid email')) {
+          } else if (data.message && data.message.toLowerCase().includes('invalid email')) {
             throw new Error('Please enter a valid email address.');
-          } else if (errorData.message && errorData.message.toLowerCase().includes('password')) {
+          } else if (data.message && data.message.toLowerCase().includes('password')) {
             throw new Error('Password requirements not met. Please use at least 6 characters.');
           } else {
-            throw new Error(`${errorData.message || 'Registration failed. Please check your information.'}`);
+            throw new Error(`${data.message || 'Registration failed. Please check your information.'}`);
           }
+        } else if (response.status === 409) {
+          throw new Error('An account with this email already exists. Please sign in instead.');
         } else if (response.status === 500) {
           throw new Error('Server error. Please try again later.');
         } else {
@@ -432,10 +453,17 @@ export class AuthService {
         }
       }
 
-      const data = await response.json();
-      console.log('Registration response data:', data);
-
-      return data;
+      // Return data with snake_case to camelCase conversion
+      return {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        mobile: data.mobile,
+        country: data.country,
+        userType: data.user_type,
+        profileCompleted: data.is_profile_completed,
+        jwtToken: data.jwt_token,
+      };
     } catch (error: any) {
       console.error('Registration error details:', error);
       

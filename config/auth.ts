@@ -31,10 +31,12 @@ export const AUTH_CONFIG = {
 
   // Backend API Configuration
   API: {
-    BASE_URL: "http://3.108.112.130:3000",
+    // BASE_URL: "http://3.108.112.130:3000",
+    BASE_URL: "http://192.168.0.100:3000",
     ENDPOINTS: {
       REGISTER: '/api/user/register',
       LOGIN: '/api/user/login',
+      TOKEN_SIGNIN: '/api/user/token-signin',
       GET_USER: '/api/user',
       UPDATE_USER: '/api/user/update',
       GET_ADVISORS: '/api/mentor/list',

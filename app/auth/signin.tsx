@@ -22,7 +22,7 @@ export default function SignInScreen() {
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { setUser } = useUser();
+  const { setUser, setJwtToken } = useUser();
 
   const handleSignIn = async () => {
     console.log('🚀 Starting signin process...');
@@ -52,7 +52,7 @@ export default function SignInScreen() {
       console.log('✅ Login successful:', userData);
       
       // Set user data in context
-      setUser({
+      await setUser({
         id: userData.id,
         name: userData.name,
         email: userData.email,
@@ -61,6 +61,12 @@ export default function SignInScreen() {
         userType: userData.userType || 'CUSTOMER',
         profileCompleted: userData.profileCompleted || false,
       });
+
+      // Save JWT token
+      if (userData.jwtToken) {
+        await setJwtToken(userData.jwtToken);
+        console.log('✅ JWT token saved');
+      }
 
       // Navigate to home
       router.replace('/(tabs)/home');

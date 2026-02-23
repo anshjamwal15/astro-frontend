@@ -26,7 +26,7 @@ export default function SignUpScreen() {
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
-  const { setUser } = useUser();
+  const { setUser, setJwtToken } = useUser();
 
   const handleSignUp = async () => {
     console.log('=== SIGNUP STARTED ===');
@@ -89,7 +89,7 @@ export default function SignUpScreen() {
       console.log('✅ Registration successful:', userData);
       
       // Set user data in context
-      setUser({
+      await setUser({
         id: userData.id,
         name: userData.name,
         email: userData.email,
@@ -98,6 +98,12 @@ export default function SignUpScreen() {
         userType: userData.userType || 'CUSTOMER',
         profileCompleted: userData.profileCompleted || false,
       });
+
+      // Save JWT token
+      if (userData.jwtToken) {
+        await setJwtToken(userData.jwtToken);
+        console.log('✅ JWT token saved');
+      }
       
       // Navigate to home
       router.replace('/(tabs)/home');
