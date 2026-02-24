@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "advijr",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dekhokaun.advijr"
@@ -22,7 +22,8 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.dekhokaun.advijr",
-      "usesCleartextTraffic": true
+      "usesCleartextTraffic": true,
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "output": "static",

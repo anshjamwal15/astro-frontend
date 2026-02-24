@@ -16,10 +16,6 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 
-import com.oney.WebRTCModule.WebRTCModuleOptions;
-import android.media.AudioAttributes
-import org.webrtc.audio.JavaAudioDeviceModule;
-
 class MainApplication : Application(), ReactApplication {
 
   override val reactNativeHost: ReactNativeHost = ReactNativeHostWrapper(
@@ -51,15 +47,6 @@ class MainApplication : Application(), ReactApplication {
     }
     loadReactNative(this)
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
-    val options: WebRTCModuleOptions = WebRTCModuleOptions.getInstance()
-    options.enableMediaProjectionService = true
-    val audioAttributes = AudioAttributes.Builder()
-      .setUsage(AudioAttributes.USAGE_MEDIA)
-      .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-      .build()
-    options.audioDeviceModule = JavaAudioDeviceModule.builder(this)
-      .setAudioAttributes(audioAttributes)
-      .createAudioDeviceModule()
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {

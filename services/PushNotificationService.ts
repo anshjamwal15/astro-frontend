@@ -1,8 +1,9 @@
 import messaging, { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import firebase from '@react-native-firebase/app';
 
 // Conditional import for CallKeep to avoid compatibility issues
 let RNCallKeep: any = null;
@@ -12,10 +13,15 @@ try {
   console.warn('CallKeep not available:', error);
 }
 
+// Ensure Firebase is initialized
+if (!firebase.apps.length) {
+  console.log('Firebase not initialized, will auto-initialize from google-services.json');
+}
+
 // Configure notification handler globally
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowAlert: false,
     shouldPlaySound: true,
     shouldSetBadge: true,
     shouldShowBanner: true,
@@ -139,17 +145,25 @@ class PushNotificationService {
     }
 
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    console.log('Current notification permission status:', existingStatus);
+    
     let finalStatus = existingStatus;
     
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
+      console.log('Requested notification permission, new status:', status);
     }
     
     if (finalStatus !== 'granted') {
-      console.log('Expo notification permission not granted');
+      console.error('❌ Expo notification permission NOT granted');
+      Alert.alert(
+        'Notifications Disabled',
+        'Please enable notifications in Settings → Apps → ADVIJR → Notifications',
+        [{ text: 'OK' }]
+      );
     } else {
-      console.log('Expo notification permission granted');
+      console.log('✅ Expo notification permission granted');
     }
   }
 
@@ -158,6 +172,12 @@ class PushNotificationService {
    */
   async requestPermission(): Promise<number> {
     try {
+      // Check if Firebase is initialized
+      if (!firebase.apps.length) {
+        console.error('Firebase not initialized. Ensure google-services.json is in android/app/');
+        return messaging.AuthorizationStatus.DENIED;
+      }
+      
       const authStatus = await messaging().requestPermission();
       return authStatus;
     } catch (error) {
@@ -268,7 +288,16 @@ class PushNotificationService {
    */
   setupForegroundHandler(): void {
     messaging().onMessage(async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
-      console.log('Foreground message received:', remoteMessage);
+      console.log('========================================');
+      console.log('📱 FOREGROUND NOTIFICATION RECEIVED');
+      console.log('========================================');
+      console.log('Full message:', JSON.stringify(remoteMessage, null, 2));
+      console.log('Notification title:', remoteMessage.notification?.title);
+      console.log('Notification body:', remoteMessage.notification?.body);
+      console.log('Data payload:', remoteMessage.data);
+      console.log('Message ID:', remoteMessage.messageId);
+      console.log('From:', remoteMessage.from);
+      console.log('========================================');
       
       // Display local notification when app is in foreground
       const { notification, data } = remoteMessage;
@@ -410,7 +439,16 @@ class PushNotificationService {
         channelId = 'messages';
       }
 
-      await Notifications.scheduleNotificationAsync({
+      console.log('========================================');
+      console.log('🔔 DISPLAYING LOCAL NOTIFICATION');
+      console.log('========================================');
+      console.log('Title:', title);
+      console.log('Body:', body);
+      console.log('Channel ID:', channelId);
+      console.log('Data:', JSON.stringify(data, null, 2));
+      console.log('========================================');
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
           title,
           body,
@@ -422,9 +460,11 @@ class PushNotificationService {
         trigger: null,
       });
       
-      console.log('Local notification displayed:', title);
+      console.log('✅ Notification displayed successfully!');
+      console.log('Notification ID:', notificationId);
+      console.log('========================================');
     } catch (error) {
-      console.error('Error displaying local notification:', error);
+      console.error('❌ Error displaying local notification:', error);
     }
   }
 
@@ -511,11 +551,16 @@ class PushNotificationService {
    */
   async handleInitialNotification(): Promise<void> {
     try {
-      const initialNotification = await messaging().getInitialNotification();
-      
-      if (initialNotification && initialNotification.data) {
-        console.log('App opened from notification:', initialNotification);
-        await this.handleNotificationTap(initialNotification.data as Record<string, any>);
+      // Check if Firebase is initialized
+      if (!firebase.apps.length) {
+        console.warn('Firebase not initialized, skipping FCM initial notification check');
+      } else {
+        const initialNotification = await messaging().getInitialNotification();
+        
+        if (initialNotification && initialNotification.data) {
+          console.log('App opened from notification:', initialNotification);
+          await this.handleNotificationTap(initialNotification.data as Record<string, any>);
+        }
       }
 
       // Also check for expo-notifications
@@ -533,10 +578,19 @@ class PushNotificationService {
    * Handle notification tap action
    */
   async handleNotificationTap(data: Record<string, any>): Promise<void> {
+    console.log('========================================');
+    console.log('🎯 HANDLING NOTIFICATION TAP');
+    console.log('========================================');
+    console.log('Data:', JSON.stringify(data, null, 2));
+    
     const notificationType = data.type;
+    console.log('Notification type:', notificationType);
 
     switch (notificationType) {
       case 'video_call':
+        console.log('📹 Navigating to video call screen...');
+        console.log('Room:', data.roomName);
+        console.log('Caller:', data.callerName);
         router.push({
           pathname: '/video-call-screen',
           params: {
@@ -548,6 +602,9 @@ class PushNotificationService {
         break;
 
       case 'voice_call':
+        console.log('📞 Navigating to voice call screen...');
+        console.log('Room:', data.roomName);
+        console.log('Caller:', data.callerName);
         router.push({
           pathname: '/(tabs)/call',
           params: {
@@ -560,6 +617,9 @@ class PushNotificationService {
 
       case 'chat':
       case 'message':
+        console.log('💬 Navigating to chat screen...');
+        console.log('Sender:', data.senderName);
+        console.log('Chat room:', data.chatRoomId);
         router.push({
           pathname: '/chatbox',
           params: {
@@ -571,8 +631,10 @@ class PushNotificationService {
         break;
 
       default:
-        console.log('Unknown notification type for tap:', notificationType);
+        console.log('⚠️ Unknown notification type:', notificationType);
     }
+    
+    console.log('========================================');
   }
 
   /**
@@ -581,12 +643,21 @@ class PushNotificationService {
   setupNotificationTapHandler(): void {
     // Handle notification tap when app is in foreground/background
     Notifications.addNotificationResponseReceivedListener(async (response) => {
-      console.log('Notification tapped:', response);
+      console.log('========================================');
+      console.log('👆 NOTIFICATION TAPPED');
+      console.log('========================================');
+      console.log('Response:', JSON.stringify(response, null, 2));
+      console.log('Action identifier:', response.actionIdentifier);
+      console.log('Notification data:', response.notification.request.content.data);
+      console.log('========================================');
+      
       const data = response.notification.request.content.data as Record<string, any>;
       if (data) {
         await this.handleNotificationTap(data);
       }
     });
+    
+    console.log('✅ Notification tap handler registered');
   }
 
   /**
