@@ -10,7 +10,8 @@
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dekhokaun.advijr"
+      "bundleIdentifier": "com.dekhokaun.advijr",
+      "googleServicesFile": "./ios/ADVIJR/GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
