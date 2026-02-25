@@ -100,6 +100,26 @@ class PushNotificationService {
    */
   async setupNotificationChannel(): Promise<void> {
     if (Platform.OS === 'android') {
+      // Set up notification categories with actions FIRST
+      await Notifications.setNotificationCategoryAsync('call', [
+        {
+          identifier: 'accept',
+          buttonTitle: 'Accept',
+          options: {
+            opensAppToForeground: true,
+          },
+        },
+        {
+          identifier: 'decline',
+          buttonTitle: 'Decline',
+          options: {
+            opensAppToForeground: false,
+          },
+        },
+      ]);
+
+      console.log('✅ Notification category "call" created with Accept/Decline actions');
+
       await Notifications.setNotificationChannelAsync('default', {
         name: 'Default',
         importance: Notifications.AndroidImportance.MAX,
@@ -118,6 +138,7 @@ class PushNotificationService {
         sound: 'default',
         enableVibrate: true,
         showBadge: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
 
       await Notifications.setNotificationChannelAsync('messages', {
@@ -131,6 +152,26 @@ class PushNotificationService {
       });
 
       console.log('Android notification channels created');
+    } else if (Platform.OS === 'ios') {
+      // iOS notification categories
+      await Notifications.setNotificationCategoryAsync('call', [
+        {
+          identifier: 'accept',
+          buttonTitle: 'Accept',
+          options: {
+            opensAppToForeground: true,
+          },
+        },
+        {
+          identifier: 'decline',
+          buttonTitle: 'Decline',
+          options: {
+            opensAppToForeground: false,
+          },
+        },
+      ]);
+      
+      console.log('iOS notification category "call" created');
     }
   }
 
@@ -432,9 +473,30 @@ class PushNotificationService {
     try {
       const notificationType = data.type || 'default';
       let channelId = 'default';
+      let categoryIdentifier: string | undefined = undefined;
       
       if (notificationType === 'video_call' || notificationType === 'voice_call') {
         channelId = 'calls';
+        categoryIdentifier = 'call';
+        
+        // Re-register category to ensure it exists
+        await Notifications.setNotificationCategoryAsync('call', [
+          {
+            identifier: 'accept',
+            buttonTitle: '✅ Accept',
+            options: {
+              opensAppToForeground: true,
+            },
+          },
+          {
+            identifier: 'decline',
+            buttonTitle: '❌ Decline',
+            options: {
+              opensAppToForeground: false,
+            },
+          },
+        ]);
+        console.log('🔄 Re-registered call notification category');
       } else if (notificationType === 'chat' || notificationType === 'message') {
         channelId = 'messages';
       }
@@ -445,23 +507,38 @@ class PushNotificationService {
       console.log('Title:', title);
       console.log('Body:', body);
       console.log('Channel ID:', channelId);
+      console.log('Category:', categoryIdentifier);
       console.log('Data:', JSON.stringify(data, null, 2));
       console.log('========================================');
 
+      const content: any = {
+        title,
+        body,
+        data,
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        sticky: true, // Keep notification visible
+        autoDismiss: false, // Don't auto-dismiss
+      };
+
+      // Add category for action buttons
+      if (categoryIdentifier) {
+        content.categoryIdentifier = categoryIdentifier;
+      }
+
+      // Add Android-specific properties
+      if (Platform.OS === 'android') {
+        content.channelId = channelId;
+      }
+
       const notificationId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          data,
-          sound: 'default',
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          ...(Platform.OS === 'android' && { channelId }),
-        },
+        content,
         trigger: null,
       });
       
       console.log('✅ Notification displayed successfully!');
       console.log('Notification ID:', notificationId);
+      console.log('Category set:', categoryIdentifier);
       console.log('========================================');
     } catch (error) {
       console.error('❌ Error displaying local notification:', error);
@@ -652,8 +729,23 @@ class PushNotificationService {
       console.log('========================================');
       
       const data = response.notification.request.content.data as Record<string, any>;
-      if (data) {
-        await this.handleNotificationTap(data);
+      const actionIdentifier = response.actionIdentifier;
+      
+      // Handle action buttons
+      if (actionIdentifier === 'accept') {
+        console.log('✅ User accepted the call');
+        if (data) {
+          await this.handleNotificationTap(data);
+        }
+      } else if (actionIdentifier === 'decline') {
+        console.log('❌ User declined the call');
+        // Dismiss notification and don't navigate
+        await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+      } else {
+        // Default tap (not on action button)
+        if (data) {
+          await this.handleNotificationTap(data);
+        }
       }
     });
     
