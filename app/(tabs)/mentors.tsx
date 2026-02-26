@@ -29,6 +29,7 @@ interface Mentor {
   rating: number;
   ratingCount: number;
   price?: number;
+  rate?: number;
   originalPrice?: number;
   isOnline: boolean;
   hasSpecialOffer?: boolean;
@@ -280,8 +281,14 @@ export default function MentorsScreen() {
                 
                 <View style={styles.priceAndAction}>
                   <View style={styles.priceContainer}>
-                    <Text style={styles.originalPrice}>₹ {mentor.originalPrice}</Text>
-                    <Text style={styles.currentPrice}>₹ {mentor.price}/min</Text>
+                    <View style={styles.rateRow}>
+                      <Ionicons name="chatbubbles-outline" size={12} color="#4CAF50" />
+                      <Text style={styles.rateText}>₹{mentor.rate || mentor.price || 17}/min</Text>
+                    </View>
+                    <View style={styles.rateRow}>
+                      <Ionicons name="videocam-outline" size={12} color="#FF6B6B" />
+                      <Text style={styles.rateText}>₹{(mentor.rate || mentor.price || 17) * 2}/min</Text>
+                    </View>
                   </View>
                   
                   <View style={styles.actionButtons}>
@@ -501,14 +508,15 @@ const styles = StyleSheet.create({
   priceContainer: {
     alignItems: 'flex-end',
     marginBottom: 10,
+    gap: 4,
   },
-  originalPrice: {
-    fontSize: 14,
-    color: '#999',
-    textDecorationLine: 'line-through',
+  rateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  currentPrice: {
-    fontSize: 16,
+  rateText: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#333',
   },

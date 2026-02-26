@@ -223,7 +223,14 @@ export default function HomeScreen() {
                     <Ionicons name="star" size={12} color="#FFB800" />
                     <Text style={styles.ratingText}>{astrologer.rating}</Text>
                   </View>
-                  <Text style={styles.priceText}>{astrologer.price}</Text>
+                  <View style={styles.priceSection}>
+                    <Text style={styles.priceLabel}>Chat</Text>
+                    <Text style={styles.priceText}>₹{astrologer.rate || astrologer.price || 17}/min</Text>
+                  </View>
+                  <View style={styles.priceSection}>
+                    <Text style={styles.priceLabel}>Video</Text>
+                    <Text style={styles.priceText}>₹{(astrologer.rate || astrologer.price || 17) * 2}/min</Text>
+                  </View>
                   <View style={styles.buttonRow}>
                     <TouchableOpacity 
                       style={styles.consultButton}
@@ -487,11 +494,20 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
   },
+  priceSection: {
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  priceLabel: {
+    fontSize: 10,
+    color: '#999',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
   priceText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#FF8C42',
     fontWeight: '700',
-    marginBottom: 8,
   },
   buttonRow: {
     flexDirection: 'row',

@@ -54,6 +54,7 @@ export interface MentorData {
   photo?: string;
   languages?: string;
   price?: number;
+  rate?: number;
   originalPrice?: number;
   ratingCount?: number;
 }
