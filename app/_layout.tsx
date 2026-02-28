@@ -24,6 +24,12 @@ export default function RootLayout() {
         await PushNotificationService.initialize();
         await PushNotificationService.handleInitialNotification();
         PushNotificationService.setupNotificationTapHandler();
+        
+        // Add a fallback to mark app as ready after a timeout
+        // This handles edge cases where SplashScreen might not call setAppReady
+        setTimeout(() => {
+          PushNotificationService.setAppReady();
+        }, 3000);
       } catch (error) {
         console.error('Error initializing push notifications:', error);
         // Continue app execution even if push notifications fail

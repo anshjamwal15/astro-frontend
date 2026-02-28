@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { useUser } from '../contexts/UserContext';
 import { AuthService } from '../services/authService';
 import { DeviceTokenService } from '../services/deviceTokenService';
+import PushNotificationService from '../services/PushNotificationService';
 
 export default function SplashScreen() {
   const { jwtToken, setUser, setJwtToken, isLoading } = useUser();
@@ -89,6 +90,9 @@ export default function SplashScreen() {
             // Don't block auto-login if device token registration fails
           }
           
+          // Mark app as ready for notification navigation
+          PushNotificationService.setAppReady();
+          
           // Navigate to home
           console.log('🏠 Navigating to home screen...');
           router.replace('/(tabs)/home');
@@ -100,6 +104,9 @@ export default function SplashScreen() {
           await setJwtToken(null);
           await setUser(null);
           
+          // Mark app as ready (even for signin flow)
+          PushNotificationService.setAppReady();
+          
           // Navigate to signin
           router.replace('/auth/signin');
         }
@@ -107,11 +114,17 @@ export default function SplashScreen() {
         console.log('❌ No JWT token found');
         console.log('🔓 Redirecting to signin...');
         
+        // Mark app as ready (even for signin flow)
+        PushNotificationService.setAppReady();
+        
         // No token, navigate to signin
         router.replace('/auth/signin');
       }
     } catch (error) {
       console.error('💥 Error during authentication check:', error);
+      
+      // Mark app as ready (even on error)
+      PushNotificationService.setAppReady();
       
       // On error, navigate to signin
       router.replace('/auth/signin');

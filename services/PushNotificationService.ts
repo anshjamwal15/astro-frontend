@@ -51,6 +51,8 @@ class PushNotificationService {
   private fcmToken: string | null = null;
   private activeCallUUID: string | null = null;
   private isInitialized: boolean = false;
+  private pendingNotificationData: Record<string, any> | null = null;
+  private isAppReady: boolean = false;
 
   /**
    * Initialize push notification service
@@ -492,10 +494,13 @@ class PushNotificationService {
   ): Promise<void> {
     try {
       const notificationType = data.type || 'default';
+      // Normalize type to handle both VIDEO_CALL and video_call formats
+      const normalizedType = notificationType.toLowerCase().replace(/_/g, '_');
+      
       let channelId = 'default';
       let categoryIdentifier: string | undefined = undefined;
       
-      if (notificationType === 'video_call' || notificationType === 'voice_call') {
+      if (normalizedType === 'video_call' || normalizedType === 'voice_call') {
         channelId = 'calls';
         categoryIdentifier = 'call';
         
@@ -517,7 +522,7 @@ class PushNotificationService {
           },
         ]);
         console.log('🔄 Re-registered call notification category');
-      } else if (notificationType === 'chat' || notificationType === 'message') {
+      } else if (normalizedType === 'chat' || normalizedType === 'message') {
         channelId = 'messages';
       }
 
@@ -528,6 +533,8 @@ class PushNotificationService {
       console.log('Body:', body);
       console.log('Channel ID:', channelId);
       console.log('Category:', categoryIdentifier);
+      console.log('Normalized Type:', normalizedType);
+      console.log('Original Type:', notificationType);
       console.log('Data:', JSON.stringify(data, null, 2));
       console.log('========================================');
 
@@ -541,9 +548,12 @@ class PushNotificationService {
         autoDismiss: false, // Don't auto-dismiss
       };
 
-      // Add category for action buttons
+      // Add category for action buttons (MUST be set for call notifications)
       if (categoryIdentifier) {
         content.categoryIdentifier = categoryIdentifier;
+        console.log('✅ Category identifier set to:', categoryIdentifier);
+      } else {
+        console.log('⚠️ No category identifier set');
       }
 
       // Add Android-specific properties
@@ -558,7 +568,7 @@ class PushNotificationService {
       
       console.log('✅ Notification displayed successfully!');
       console.log('Notification ID:', notificationId);
-      console.log('Category set:', categoryIdentifier);
+      console.log('Category set:', content.categoryIdentifier);
       console.log('========================================');
     } catch (error) {
       console.error('❌ Error displaying local notification:', error);
@@ -644,6 +654,32 @@ class PushNotificationService {
   }
 
   /**
+   * Mark app as ready for navigation (call this after authentication check)
+   */
+  setAppReady(): void {
+    // Prevent duplicate processing
+    if (this.isAppReady) {
+      console.log('⚠️ App already marked as ready, skipping...');
+      return;
+    }
+    
+    console.log('✅ App marked as ready for navigation');
+    this.isAppReady = true;
+    
+    // Process pending notification if any
+    if (this.pendingNotificationData) {
+      console.log('📱 Processing pending notification from killed state...');
+      const data = this.pendingNotificationData;
+      this.pendingNotificationData = null;
+      
+      // Add a small delay to ensure navigation stack is ready
+      setTimeout(() => {
+        this.handleNotificationTap(data);
+      }, 500);
+    }
+  }
+
+  /**
    * Handle notification tap when app is in background/killed state
    */
   async handleInitialNotification(): Promise<void> {
@@ -679,11 +715,22 @@ class PushNotificationService {
     console.log('🎯 HANDLING NOTIFICATION TAP');
     console.log('========================================');
     console.log('Data:', JSON.stringify(data, null, 2));
+    console.log('App ready:', this.isAppReady);
+    
+    // If app is not ready yet (killed state), store the notification for later
+    if (!this.isAppReady) {
+      console.log('⏳ App not ready yet, storing notification for later processing...');
+      this.pendingNotificationData = data;
+      return;
+    }
     
     const notificationType = data.type;
     console.log('Notification type:', notificationType);
 
-    switch (notificationType) {
+    // Normalize notification type (handle both VIDEO_CALL and video_call formats)
+    const normalizedType = notificationType?.toLowerCase().replace(/_/g, '_');
+
+    switch (normalizedType) {
       case 'video_call':
         console.log('📹 Navigating to video call screen...');
         console.log('Room:', data.roomName);
@@ -729,6 +776,7 @@ class PushNotificationService {
 
       default:
         console.log('⚠️ Unknown notification type:', notificationType);
+        console.log('Normalized type was:', normalizedType);
     }
     
     console.log('========================================');
@@ -821,6 +869,8 @@ class PushNotificationService {
     }
     this.callDataStore.clear();
     this.isInitialized = false;
+    this.isAppReady = false;
+    this.pendingNotificationData = null;
   }
 }
 
