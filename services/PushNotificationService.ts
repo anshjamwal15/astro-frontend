@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import firebase from '@react-native-firebase/app';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Conditional import for CallKeep to avoid compatibility issues
 let RNCallKeep: any = null;
@@ -363,7 +364,26 @@ class PushNotificationService {
     messaging().onTokenRefresh(async (token: string) => {
       console.log('FCM token refreshed:', token);
       this.fcmToken = token;
-      // TODO: Send updated token to backend
+      
+      // Send updated token to backend
+      try {
+        const userData = await AsyncStorage.getItem('user');
+        if (userData) {
+          const user = JSON.parse(userData);
+          if (user.id) {
+            // Import DeviceTokenService dynamically to avoid circular dependency
+            const { DeviceTokenService } = await import('./deviceTokenService');
+            const result = await DeviceTokenService.updateDeviceToken(user.id, token);
+            if (result.success) {
+              console.log('✅ Updated device token on backend after refresh');
+            } else {
+              console.warn('⚠️ Failed to update device token on backend:', result.error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error updating device token on backend:', error);
+      }
     });
   }
 

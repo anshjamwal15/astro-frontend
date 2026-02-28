@@ -18,6 +18,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { ApiService } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
 import { WalletService } from '../services/WalletService';
+import { BillingTimerService } from '../services/BillingTimerService';
+import { CallNotificationService } from '../services/CallNotificationService';
+import { generateVideoRoomName, generateVoiceRoomName, generateCallId, generateChatRoomName } from '../utils/roomNameGenerator';
 
 interface Message {
   id: string;
@@ -43,14 +46,15 @@ export default function ChatBoxScreen() {
   const [currentBalance, setCurrentBalance] = useState(0);
   const [estimatedMinutes, setEstimatedMinutes] = useState(0);
   const [showLowBalanceWarning, setShowLowBalanceWarning] = useState(false);
+  const [minutesPassed, setMinutesPassed] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const balanceCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (user && astrologerId) {
       initializeChatRoom();
-      if (sessionId) {
-        startBalanceMonitoring();
+      if (sessionId && ratePerMinute) {
+        startBillingTimer();
         setSessionActive(true);
       }
     }
@@ -58,7 +62,7 @@ export default function ChatBoxScreen() {
     return () => {
       cleanup();
     };
-  }, [user, astrologerId, sessionId]);
+  }, [user, astrologerId, sessionId, ratePerMinute]);
 
   useEffect(() => {
     // Auto scroll to bottom when new messages are added
@@ -72,46 +76,85 @@ export default function ChatBoxScreen() {
       clearInterval(balanceCheckInterval.current);
       balanceCheckInterval.current = null;
     }
+    
+    // Stop billing timer if active
+    if (sessionId) {
+      BillingTimerService.stopTimer(sessionId as string);
+    }
   };
 
-  const startBalanceMonitoring = () => {
-    if (!sessionId) return;
+  const startBillingTimer = () => {
+    if (!sessionId || !user || !astrologerId || !ratePerMinute) return;
 
-    // Check balance every 30 seconds
-    balanceCheckInterval.current = setInterval(async () => {
-      try {
-        const status = await WalletService.checkSessionStatus(sessionId as string);
-        setCurrentBalance(status.currentBalance);
-        setEstimatedMinutes(status.estimatedMinutes);
+    const rate = parseFloat(ratePerMinute as string);
+    
+    console.log(`Starting billing timer: ₹${rate}/min`);
+
+    BillingTimerService.startTimer({
+      sessionId: sessionId as string,
+      userId: user.id,
+      mentorId: astrologerId as string,
+      sessionType: 'CHAT',
+      ratePerMinute: rate,
+      onMinuteComplete: (minutes, amountDeducted, remainingBalance) => {
+        console.log(`Minute ${minutes} completed. Deducted: ₹${amountDeducted}`);
+        setMinutesPassed(minutes);
+        setCurrentBalance(remainingBalance);
         
-        if (status.status === 'LOW_BALANCE') {
-          setShowLowBalanceWarning(true);
-          
-          if (status.estimatedMinutes < 1) {
-            Alert.alert(
-              'Insufficient Balance',
-              'Your balance is too low to continue. The chat will end now.',
-              [{ text: 'OK', onPress: () => endChatSession('INSUFFICIENT_BALANCE') }]
-            );
+        // Show continue dialog
+        BillingTimerService.showContinueDialog(
+          minutes,
+          amountDeducted,
+          remainingBalance,
+          () => {
+            console.log('User chose to continue');
+            // Continue - do nothing, timer will keep running
+          },
+          () => {
+            console.log('User chose to cancel');
+            endChatSession('USER_CANCELLED');
           }
-        } else if (status.status === 'INSUFFICIENT_BALANCE') {
-          endChatSession('INSUFFICIENT_BALANCE');
-        }
-      } catch (error) {
-        console.error('Error checking session status:', error);
-      }
-    }, 30000);
+        );
+      },
+      onInsufficientBalance: (minutes, totalCost) => {
+        console.log(`Insufficient balance after ${minutes} minutes`);
+        setMinutesPassed(minutes);
+        
+        // Show insufficient balance dialog
+        BillingTimerService.showInsufficientBalanceDialog(
+          minutes,
+          totalCost,
+          () => {
+            // Navigate to add money
+            Alert.alert('Add Money', 'Please use the wallet section to add money.');
+            endChatSession('INSUFFICIENT_BALANCE');
+          },
+          () => {
+            // Cancel - end session
+            endChatSession('INSUFFICIENT_BALANCE');
+          }
+        );
+      },
+      onSessionEnd: (summary) => {
+        console.log('Session ended:', summary);
+      },
+    });
   };
 
-  const endChatSession = async (reason: string = 'NORMAL_END') => {
+  const endChatSession = async (reason: 'USER_CANCELLED' | 'INSUFFICIENT_BALANCE' | 'NORMAL_END' = 'NORMAL_END') => {
     if (!sessionId) return;
 
     try {
-      const endStatus = await WalletService.endSession(sessionId as string, reason);
+      setSessionActive(false);
+      
+      // End the billing timer and get summary
+      const summary = await BillingTimerService.endSession(sessionId as string, reason);
       
       const message = reason === 'INSUFFICIENT_BALANCE' 
-        ? `Chat ended due to insufficient balance.\n\nDuration: ${endStatus.durationMinutes || 0} minutes\nCost: ₹${endStatus.totalCost?.toFixed(2) || '0.00'}`
-        : `Chat ended successfully.\n\nDuration: ${endStatus.durationMinutes || 0} minutes\nCost: ₹${endStatus.totalCost?.toFixed(2) || '0.00'}\nRemaining Balance: ₹${endStatus.currentBalance.toFixed(2)}`;
+        ? `Chat ended due to insufficient balance.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}`
+        : reason === 'USER_CANCELLED'
+        ? `Chat cancelled by user.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}\nRemaining Balance: ₹${summary.remainingBalance.toFixed(2)}`
+        : `Chat ended successfully.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}\nRemaining Balance: ₹${summary.remainingBalance.toFixed(2)}`;
       
       Alert.alert('Chat Summary', message, [
         { text: 'OK', onPress: () => router.back() }
@@ -120,7 +163,6 @@ export default function ChatBoxScreen() {
       console.error('Error ending chat session:', error);
       router.back();
     } finally {
-      setSessionActive(false);
       cleanup();
     }
   };
@@ -128,6 +170,27 @@ export default function ChatBoxScreen() {
   const initializeChatRoom = async () => {
     try {
       setIsLoading(true);
+      
+      // Send chat notification to mentor
+      if (user && astrologerId && sessionId) {
+        console.log('💬 Sending chat notification to mentor...');
+        const chatRoomName = generateChatRoomName(); // Short unique room name
+        const notificationResult = await CallNotificationService.sendNotificationWithAutoToken(
+          'CHAT',
+          user.name || 'User',
+          user.id,
+          astrologerId as string,
+          chatRoomName,
+          sessionId as string
+        );
+
+        if (notificationResult.success) {
+          console.log('✅ Chat notification sent successfully');
+        } else {
+          console.warn('⚠️ Failed to send chat notification:', notificationResult.message);
+          // Continue with chat even if notification fails
+        }
+      }
       
       // Create a unique chat room name for this user-astrologer pair
       const roomName = `chat_${user?.id}_${astrologerId}`;
@@ -293,22 +356,97 @@ export default function ChatBoxScreen() {
     }
   };
 
-  const handleCallPress = () => {
+  const handleCallPress = async () => {
+    if (!user?.id || !astrologerId) {
+      Alert.alert('Error', 'Unable to start call. Please try again.');
+      return;
+    }
+
     Alert.alert(
       'Voice Call',
       `Start voice call with ${astrologerName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Call', onPress: () => Alert.alert('Calling...', 'Voice call feature will be available soon!') }
+        { 
+          text: 'Call', 
+          onPress: async () => {
+            try {
+              // Generate short unique IDs
+              const callId = generateCallId(); // Short unique call ID
+              const roomName = generateVoiceRoomName(); // Short unique room name
+
+              // Send voice call notification
+              console.log('📞 Sending voice call notification...');
+              const notificationResult = await CallNotificationService.sendNotificationWithAutoToken(
+                'VOICE_CALL',
+                user.name || 'User',
+                user.id,
+                astrologerId as string,
+                roomName,
+                callId
+              );
+
+              if (notificationResult.success) {
+                console.log('✅ Voice call notification sent successfully');
+                Alert.alert('Calling...', 'Voice call feature will be available soon!');
+              } else {
+                console.warn('⚠️ Failed to send voice call notification:', notificationResult.message);
+                Alert.alert('Error', 'Failed to initiate call. Please try again.');
+              }
+            } catch (error) {
+              console.error('Error starting voice call:', error);
+              Alert.alert('Error', 'Failed to start call. Please try again.');
+            }
+          }
+        }
       ]
     );
   };
 
-  const handleVideoCallPress = () => {
+  const handleVideoCallPress = async () => {
+    if (!user?.id || !astrologerId) {
+      Alert.alert('Error', 'Unable to start video call. Please try again.');
+      return;
+    }
+
     Alert.alert(
-      'Coming Soon',
-      'Video call feature will be available soon!',
-      [{ text: 'OK' }]
+      'Video Call',
+      `Start video call with ${astrologerName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Start', 
+          onPress: async () => {
+            try {
+              // Generate short unique IDs
+              const callId = generateCallId(); // Short unique call ID
+              const roomName = generateVideoRoomName(); // Short unique room name
+
+              // Send video call notification
+              console.log('📹 Sending video call notification...');
+              const notificationResult = await CallNotificationService.sendNotificationWithAutoToken(
+                'VIDEO_CALL',
+                user.name || 'User',
+                user.id,
+                astrologerId as string,
+                roomName,
+                callId
+              );
+
+              if (notificationResult.success) {
+                console.log('✅ Video call notification sent successfully');
+                Alert.alert('Starting...', 'Video call feature will be available soon!');
+              } else {
+                console.warn('⚠️ Failed to send video call notification:', notificationResult.message);
+                Alert.alert('Error', 'Failed to initiate video call. Please try again.');
+              }
+            } catch (error) {
+              console.error('Error starting video call:', error);
+              Alert.alert('Error', 'Failed to start video call. Please try again.');
+            }
+          }
+        }
+      ]
     );
   };
 
@@ -364,7 +502,7 @@ export default function ChatBoxScreen() {
               </Text>
               {sessionActive && (
                 <Text style={styles.billingInfo}>
-                  ₹{ratePerMinute}/min • Balance: ₹{currentBalance.toFixed(2)}
+                  ₹{ratePerMinute}/min • {minutesPassed} min • Balance: ₹{currentBalance.toFixed(2)}
                 </Text>
               )}
             </View>

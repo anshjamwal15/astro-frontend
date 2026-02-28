@@ -17,6 +17,7 @@ import { useUser, getFirstName } from '../../contexts/UserContext';
 import { WalletService } from '../../services/WalletService';
 import WalletBalance from '../../components/WalletBalance';
 import { ApiService } from '../../services/apiService';
+import { generateVideoRoomName, generateSessionId } from '../../utils/roomNameGenerator';
 
 interface Mentor {
   id: string;
@@ -131,7 +132,7 @@ export default function MentorsScreen() {
         return;
       }
 
-      const sessionId = `chat_${user.id}_${mentor.id}_${Date.now()}`;
+      const sessionId = generateSessionId('chat'); // Short unique ID
       
       try {
         const sessionStatus = await WalletService.startSession(
@@ -168,10 +169,36 @@ export default function MentorsScreen() {
   };
 
   const handleVideoCallPress = async (mentor: Mentor) => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Please login to start a video call.');
+      return;
+    }
+
+    const videoRate = (mentor.rate || mentor.price || 17) * 2;
+    const sessionId = generateSessionId('video'); // Short unique ID
+    const roomName = generateVideoRoomName(); // Short unique room name
+
     Alert.alert(
-      'Coming Soon',
-      'Video call feature will be available soon!',
-      [{ text: 'OK' }]
+      'Start Video Call',
+      `Video call with ${mentor.name}\nRate: ₹${videoRate}/min\n\nDo you want to start the call?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start Call',
+          onPress: () => {
+            router.push({
+              pathname: '/video-call-screen',
+              params: {
+                roomName: roomName,
+                isHost: 'true',
+                mentorId: mentor.id,
+                sessionId: sessionId,
+                ratePerMinute: videoRate.toString(),
+              }
+            });
+          }
+        }
+      ]
     );
   };
 

@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useUser } from '../contexts/UserContext';
 import { AuthService } from '../services/authService';
+import { DeviceTokenService } from '../services/deviceTokenService';
 
 export default function SplashScreen() {
   const { jwtToken, setUser, setJwtToken, isLoading } = useUser();
@@ -74,6 +75,19 @@ export default function SplashScreen() {
           
           // Update with refreshed token
           await setJwtToken(userData.jwtToken);
+          
+          // Register device token with backend for push notifications
+          try {
+            const deviceTokenResult = await DeviceTokenService.registerDeviceToken(userData.id);
+            if (deviceTokenResult.success) {
+              console.log('✅ Device token registered with backend during auto-login');
+            } else {
+              console.warn('⚠️ Failed to register device token:', deviceTokenResult.error);
+            }
+          } catch (deviceTokenError) {
+            console.error('❌ Error registering device token:', deviceTokenError);
+            // Don't block auto-login if device token registration fails
+          }
           
           // Navigate to home
           console.log('🏠 Navigating to home screen...');

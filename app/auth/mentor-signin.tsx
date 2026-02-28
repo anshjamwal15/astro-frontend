@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMentor } from '../../contexts/MentorContext';
 import { MentorAuthService } from '../../services/mentorAuthService';
+import { DeviceTokenService } from '../../services/deviceTokenService';
 
 export default function MentorSignInScreen() {
   const [formData, setFormData] = useState({
@@ -52,6 +53,21 @@ export default function MentorSignInScreen() {
       
       // Set mentor data in context
       setMentor(mentorData);
+
+      // Register device token with backend for push notifications
+      if (mentorData.id) {
+        try {
+          const deviceTokenResult = await DeviceTokenService.registerDeviceToken(mentorData.id.toString());
+          if (deviceTokenResult.success) {
+            console.log('✅ Device token registered with backend for mentor');
+          } else {
+            console.warn('⚠️ Failed to register device token:', deviceTokenResult.error);
+          }
+        } catch (deviceTokenError) {
+          console.error('❌ Error registering device token:', deviceTokenError);
+          // Don't block login if device token registration fails
+        }
+      }
 
       // Navigate to mentor dashboard
       router.replace('/mentor/(tabs)/dashboard');

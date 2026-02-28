@@ -16,6 +16,8 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser, getFirstName } from '../../contexts/UserContext';
 import { ApiService } from '../../services/apiService';
+import { WalletService } from '../../services/WalletService';
+import { generateVideoRoomName, generateSessionId } from '../../utils/roomNameGenerator';
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,25 +91,83 @@ export default function HomeScreen() {
   };
 
   const handleVideoCall = (astrologer?: any) => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Please login to start a video call.');
+      return;
+    }
+
+    if (!astrologer) {
+      Alert.alert('Coming Soon', 'Video call feature will be available soon!');
+      return;
+    }
+
+    const videoRate = (astrologer.rate || astrologer.price || 17) * 2;
+    const sessionId = generateSessionId('video'); // Short unique ID
+    const roomName = generateVideoRoomName(); // Short unique room name
+
     Alert.alert(
-      'Coming Soon',
-      'Video call feature will be available soon!',
-      [{ text: 'OK' }]
+      'Start Video Call',
+      `Video call with ${astrologer.name}\nRate: ₹${videoRate}/min\n\nDo you want to start the call?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start Call',
+          onPress: () => {
+            router.push({
+              pathname: '/video-call-screen',
+              params: {
+                roomName: roomName,
+                isHost: 'true',
+                mentorId: astrologer.id,
+                sessionId: sessionId,
+                ratePerMinute: videoRate.toString(),
+              }
+            });
+          }
+        }
+      ]
     );
   };
 
-  const handleConsultation = (astrologer?: any) => {
-    // If astrologer data is provided, navigate to chatbox directly
+  const handleConsultation = async (astrologer?: any) => {
+    if (!user?.id) {
+      Alert.alert('Error', 'Please login to start a chat.');
+      return;
+    }
+
+    // If astrologer data is provided, start a chat session
     if (astrologer) {
-      router.push({
-        pathname: '/chatbox',
-        params: {
-          astrologerId: astrologer.id.toString(),
-          astrologerName: astrologer.name,
-          astrologerImage: 'https://via.placeholder.com/60x60/4A90E2/FFFFFF?text=' + astrologer.name.charAt(0),
-          isOnline: astrologer.isOnline ?? false
+      try {
+        const chatRate = astrologer.rate || astrologer.price || 17;
+        const sessionId = generateSessionId('chat'); // Short unique ID
+        
+        // Start the session
+        const sessionStatus = await WalletService.startSession(
+          sessionId,
+          user.id,
+          astrologer.id,
+          'CHAT'
+        );
+
+        if (sessionStatus.status === 'STARTED') {
+          router.push({
+            pathname: '/chatbox',
+            params: {
+              astrologerId: astrologer.id.toString(),
+              astrologerName: astrologer.name,
+              astrologerImage: astrologer.image || `https://via.placeholder.com/60x60/4A90E2/FFFFFF?text=${astrologer.name.charAt(0)}`,
+              isOnline: astrologer.isOnline ?? false,
+              sessionId: sessionId,
+              ratePerMinute: chatRate.toString(),
+            }
+          });
+        } else {
+          Alert.alert('Error', sessionStatus.message || 'Failed to start chat session');
         }
-      });
+      } catch (error: any) {
+        console.error('Error starting chat:', error);
+        Alert.alert('Error', 'Unable to start chat. Please try again.');
+      }
     } else {
       // Navigate to chat list
       router.push('/(tabs)/chat');

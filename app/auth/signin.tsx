@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useUser } from '../../contexts/UserContext';
 import { AuthService } from '../../services/authService';
+import { DeviceTokenService } from '../../services/deviceTokenService';
 
 export default function SignInScreen() {
   const [formData, setFormData] = useState({
@@ -66,6 +67,19 @@ export default function SignInScreen() {
       if (userData.jwtToken) {
         await setJwtToken(userData.jwtToken);
         console.log('✅ JWT token saved');
+      }
+
+      // Register device token with backend for push notifications
+      try {
+        const deviceTokenResult = await DeviceTokenService.registerDeviceToken(userData.id);
+        if (deviceTokenResult.success) {
+          console.log('✅ Device token registered with backend');
+        } else {
+          console.warn('⚠️ Failed to register device token:', deviceTokenResult.error);
+        }
+      } catch (deviceTokenError) {
+        console.error('❌ Error registering device token:', deviceTokenError);
+        // Don't block login if device token registration fails
       }
 
       // Navigate to home
