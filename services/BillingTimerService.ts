@@ -92,10 +92,15 @@ export class BillingTimerService {
         return;
       }
 
-      // Deduct the amount (simulate by calling wallet API)
-      // In a real implementation, this would call a deduction endpoint
+      // Deduct the amount from wallet (creates DEBIT transaction)
+      const updatedBalance = await WalletService.deductMoney(
+        config.userId, 
+        amountToDeduct, 
+        config.sessionType
+      );
+      
       session.totalDeducted += amountToDeduct;
-      const remainingBalance = currentBalance - amountToDeduct;
+      const remainingBalance = updatedBalance.balance;
 
       console.log(`✅ Deducted ₹${amountToDeduct}. Remaining: ₹${remainingBalance}`);
 
@@ -104,7 +109,9 @@ export class BillingTimerService {
 
     } catch (error) {
       console.error('Error processing minute tick:', error);
-      // Continue timer even on error to avoid stopping the session unexpectedly
+      // Stop timer on deduction error to prevent further charges
+      this.stopTimer(sessionId);
+      config.onInsufficientBalance(session.minutesPassed, session.totalDeducted);
     }
   }
 
@@ -168,11 +175,13 @@ export class BillingTimerService {
     // Notify about session end
     config.onSessionEnd(summary);
 
-    // End the billing session on the backend
+    // End the billing session on the backend (optional - for tracking purposes)
+    // This is not critical, so we just log warnings if it fails
     try {
       await WalletService.endSession(sessionId, endReason);
+      console.log(`✅ Backend session ${sessionId} ended successfully`);
     } catch (error) {
-      console.error('Error ending backend session:', error);
+      console.warn('Backend session end failed (non-critical):', error);
     }
 
     return summary;

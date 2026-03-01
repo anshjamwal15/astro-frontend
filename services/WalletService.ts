@@ -1,5 +1,7 @@
 import { AUTH_CONFIG } from '../config/auth';
 import { ensureUUID } from '../utils/uuid';
+import { WalletApiService } from './WalletApiService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface WalletBalance {
   userId: string;
@@ -29,33 +31,25 @@ export interface BillingRates {
 export class WalletService {
   private static baseUrl = AUTH_CONFIG.API.BASE_URL;
 
-  // Get wallet balance
+  /**
+   * Get JWT token from storage
+   */
+  private static async getJwtToken(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem('jwt_token');
+    } catch (error) {
+      console.error('Error getting JWT token:', error);
+      return null;
+    }
+  }
+
+  // Get wallet balance using new WalletApiService
   static async getBalance(userId: string): Promise<WalletBalance> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/wallet/balance/${ensureUUID(userId)}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-API-Key': AUTH_CONFIG.API.API_KEY,
-          'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
-        },
-      });
-
-      if (!response.ok) {
-        // Return default 0 balance instead of throwing error
-        console.warn(`Wallet balance API returned ${response.status}, defaulting to 0`);
-        return {
-          userId: userId,
-          balance: 0,
-          currency: 'INR'
-        };
-      }
-
-      const data = await response.json();
+      const balanceData = await WalletApiService.getBalance(ensureUUID(userId));
       return {
-        userId: data.user_id || userId,
-        balance: parseFloat(data.balance || 0),
+        userId: balanceData.userId,
+        balance: balanceData.balance,
         currency: 'INR'
       };
     } catch (error: any) {
@@ -69,32 +63,13 @@ export class WalletService {
     }
   }
 
-  // Add money to wallet
+  // Add money to wallet using new WalletApiService
   static async addMoney(userId: string, amount: number, method: string = 'UPI'): Promise<WalletBalance> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/wallet/add-money`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-API-Key': AUTH_CONFIG.API.API_KEY,
-          'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
-        },
-        body: JSON.stringify({
-          user_id: ensureUUID(userId),
-          amount: amount,
-          method: method
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to add money: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const result = await WalletApiService.addMoney(amount, method, ensureUUID(userId));
       return {
-        userId: data.user_id || userId,
-        balance: parseFloat(data.balance || 0),
+        userId: result.userId,
+        balance: result.balance,
         currency: 'INR'
       };
     } catch (error: any) {
@@ -103,7 +78,22 @@ export class WalletService {
     }
   }
 
-  // Start billable session (webhook)
+  // Deduct money from wallet for calls/chat (creates DEBIT transaction)
+  static async deductMoney(userId: string, amount: number, sessionType: 'AUDIO_CALL' | 'VIDEO_CALL' | 'CHAT'): Promise<WalletBalance> {
+    try {
+      const result = await WalletApiService.deductMoney(amount, sessionType, ensureUUID(userId));
+      return {
+        userId: result.userId,
+        balance: result.balance,
+        currency: 'INR'
+      };
+    } catch (error: any) {
+      console.error('Error deducting money from wallet:', error);
+      throw new Error(`Failed to deduct money: ${error.message}`);
+    }
+  }
+
+  // Start billable session (webhook) - Optional, for backend billing tracking
   static async startSession(
     sessionId: string, 
     userId: string, 
@@ -111,11 +101,14 @@ export class WalletService {
     sessionType: 'AUDIO_CALL' | 'VIDEO_CALL' | 'CHAT'
   ): Promise<SessionStatus> {
     try {
+      const jwtToken = await this.getJwtToken();
+      
       const response = await fetch(`${this.baseUrl}/api/billing/session/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
           'X-API-Key': AUTH_CONFIG.API.API_KEY,
           'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
         },
@@ -129,7 +122,16 @@ export class WalletService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to start session: ${response.status}`);
+        console.warn('Backend session start failed:', errorData.message || response.status);
+        // Return a default status instead of throwing
+        return {
+          sessionId,
+          status: 'STARTED',
+          currentBalance: 0,
+          ratePerMinute: 0,
+          estimatedMinutes: 0,
+          message: 'Session started (backend tracking unavailable)'
+        };
       }
 
       const data = await response.json();
@@ -142,19 +144,30 @@ export class WalletService {
         message: data.message || 'Session started'
       };
     } catch (error: any) {
-      console.error('Error starting session:', error);
-      throw error;
+      console.warn('Error starting backend session:', error.message);
+      // Return a default status instead of throwing
+      return {
+        sessionId,
+        status: 'STARTED',
+        currentBalance: 0,
+        ratePerMinute: 0,
+        estimatedMinutes: 0,
+        message: 'Session started (backend tracking unavailable)'
+      };
     }
   }
 
-  // End billable session (webhook)
+  // End billable session (webhook) - Optional, for backend billing tracking
   static async endSession(sessionId: string, reason: string = 'NORMAL_END'): Promise<SessionStatus> {
     try {
+      const jwtToken = await this.getJwtToken();
+      
       const response = await fetch(`${this.baseUrl}/api/billing/session/end`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
           'X-API-Key': AUTH_CONFIG.API.API_KEY,
           'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
         },
@@ -166,7 +179,16 @@ export class WalletService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to end session: ${response.status}`);
+        console.warn('Backend session end failed:', errorData.message || response.status);
+        // Return a default status instead of throwing
+        return {
+          sessionId,
+          status: 'ENDED',
+          currentBalance: 0,
+          ratePerMinute: 0,
+          estimatedMinutes: 0,
+          message: 'Session ended (backend tracking unavailable)'
+        };
       }
 
       const data = await response.json();
@@ -181,26 +203,46 @@ export class WalletService {
         message: data.message || 'Session ended'
       };
     } catch (error: any) {
-      console.error('Error ending session:', error);
-      throw error;
+      console.warn('Error ending backend session:', error.message);
+      // Return a default status instead of throwing
+      return {
+        sessionId,
+        status: 'ENDED',
+        currentBalance: 0,
+        ratePerMinute: 0,
+        estimatedMinutes: 0,
+        message: 'Session ended (backend tracking unavailable)'
+      };
     }
   }
 
-  // Check session status (webhook)
+  // Check session status (webhook) - Optional, for backend billing tracking
   static async checkSessionStatus(sessionId: string): Promise<SessionStatus> {
     try {
+      const jwtToken = await this.getJwtToken();
+      
       const response = await fetch(`${this.baseUrl}/api/billing/session/${sessionId}/status`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
           'X-API-Key': AUTH_CONFIG.API.API_KEY,
           'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to check session status: ${response.status}`);
+        console.warn('Backend session status check failed:', response.status);
+        // Return a default status instead of throwing
+        return {
+          sessionId,
+          status: 'NOT_FOUND',
+          currentBalance: 0,
+          ratePerMinute: 0,
+          estimatedMinutes: 0,
+          message: 'Session status unavailable'
+        };
       }
 
       const data = await response.json();
@@ -213,8 +255,16 @@ export class WalletService {
         message: data.message || 'Status checked'
       };
     } catch (error: any) {
-      console.error('Error checking session status:', error);
-      throw error;
+      console.warn('Error checking backend session status:', error.message);
+      // Return a default status instead of throwing
+      return {
+        sessionId,
+        status: 'NOT_FOUND',
+        currentBalance: 0,
+        ratePerMinute: 0,
+        estimatedMinutes: 0,
+        message: 'Session status unavailable'
+      };
     }
   }
 
@@ -246,9 +296,7 @@ export class WalletService {
     sessionType: 'AUDIO_CALL' | 'VIDEO_CALL' | 'CHAT'
   ): Promise<{ canStart: boolean; balance: number; required: number; message: string }> {
     try {
-      // For now, always allow sessions since wallet endpoints might not be fully working
-      // In production, you would check the actual wallet balance
-      const mockBalance = 100; // Mock balance
+      const balance = await this.getBalance(userId);
       
       const rates = {
         'AUDIO_CALL': 11.00,
@@ -258,16 +306,6 @@ export class WalletService {
       
       const ratePerMinute = rates[sessionType];
       const requiredBalance = ratePerMinute * 2; // 2 minutes minimum
-      
-      return {
-        canStart: true, // Always allow for now
-        balance: mockBalance,
-        required: requiredBalance,
-        message: `You have ₹${mockBalance.toFixed(2)}. Session can start.`
-      };
-      
-      /* Original wallet check - commented out until wallet is fully implemented
-      const balance = await this.getBalance(userId);
       
       const canStart = balance.balance >= requiredBalance;
       
@@ -279,14 +317,14 @@ export class WalletService {
           ? `You have ₹${balance.balance.toFixed(2)}. Session can start.`
           : `Insufficient balance. You have ₹${balance.balance.toFixed(2)}, but need ₹${requiredBalance.toFixed(2)} minimum.`
       };
-      */
     } catch (error: any) {
-      // Allow session to start even if wallet check fails
+      console.error('Error checking if session can start:', error);
+      // Return false if wallet check fails
       return {
-        canStart: true,
-        balance: 100,
+        canStart: false,
+        balance: 0,
         required: 0,
-        message: 'Session can start (wallet check skipped)'
+        message: 'Unable to verify wallet balance. Please try again.'
       };
     }
   }

@@ -169,4 +169,48 @@ export class WalletApiService {
       throw error;
     }
   }
+
+  /**
+   * Deduct money from wallet (creates a DEBIT transaction)
+   * Used for video calls, voice calls, and chat sessions
+   */
+  static async deductMoney(amount: number, reference: string, userId?: string): Promise<AddMoneyResponse> {
+    try {
+      const jwtToken = await this.getJwtToken();
+      
+      const response = await fetch(`${AUTH_CONFIG.API.BASE_URL}/api/wallet/deduct-money`, {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
+        },
+        body: JSON.stringify({
+          ...(userId && { userId }),
+          amount,
+          method: reference, // Reference like "VIDEO_CALL", "AUDIO_CALL", "CHAT"
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to deduct money: ${response.statusText} - ${errorText}`);
+      }
+
+      const data: any = await response.json();
+      
+      // Transform snake_case to camelCase
+      const transformedData: AddMoneyResponse = {
+        userId: data.userId || data.user_id,
+        balance: data.balance,
+        createdAt: data.createdAt || data.created_at,
+        updatedAt: data.updatedAt || data.updated_at,
+      };
+      
+      return transformedData;
+    } catch (error) {
+      console.error('Error deducting money from wallet:', error);
+      throw error;
+    }
+  }
 }

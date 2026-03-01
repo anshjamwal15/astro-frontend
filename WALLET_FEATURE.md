@@ -309,3 +309,141 @@ export interface AddMoneyResponse {
   updatedAt: string;
 }
 ```
+
+
+## Wallet Integration with Video/Voice Calls and Chat
+
+### Overview
+The wallet system is now fully integrated with video calling, voice calling, and chat features. Money is automatically deducted from the user's wallet during active sessions.
+
+### Deduct Money API
+
+#### POST /api/wallet/deduct-money
+**Description:** Deduct money from wallet (creates a DEBIT transaction)
+
+**Authentication:** JWT token in Authorization header OR userId in request body
+
+**Request:**
+```json
+{
+  "userId": "ef66fcd4-b3a1-4332-a3cf-74cdf7d32713",  // Optional if JWT sent
+  "amount": 17.00,
+  "method": "VIDEO_CALL"  // Can be "VIDEO_CALL", "AUDIO_CALL", or "CHAT"
+}
+```
+
+**Response:**
+```json
+{
+  "userId": "ef66fcd4-b3a1-4332-a3cf-74cdf7d32713",
+  "balance": 1483.00,
+  "createdAt": "2026-03-01T09:00:00",
+  "updatedAt": "2026-03-01T09:36:00"
+}
+```
+
+### Service Updates
+
+#### WalletApiService
+- Added `deductMoney()` method for creating DEBIT transactions
+- Supports JWT authentication with userId fallback
+- Transforms snake_case responses to camelCase
+- Reference parameter indicates the session type (VIDEO_CALL, AUDIO_CALL, CHAT)
+
+#### WalletService
+- Updated to use WalletApiService with JWT authentication
+- Added `deductMoney()` method that wraps WalletApiService
+- Updated `getBalance()` and `addMoney()` to use new API
+- Enabled actual wallet balance checking in `canStartSession()`
+- All session management methods now include JWT token
+- Backend billing session endpoints (start/end/status) are optional and non-critical
+- Graceful fallback if backend billing tracking is unavailable
+
+#### BillingTimerService
+- Updated to call `WalletService.deductMoney()` every minute
+- Creates DEBIT transactions with proper session type reference
+- Stops timer immediately if deduction fails
+- Prevents further charges on insufficient balance
+- Backend session tracking is optional and non-critical
+
+### Session Types and Rates
+
+| Session Type | Rate per Minute | Transaction Reference |
+|-------------|-----------------|----------------------|
+| Video Call  | ₹17.00         | VIDEO_CALL           |
+| Audio Call  | ₹11.00         | AUDIO_CALL           |
+| Chat        | ₹5.00          | CHAT                 |
+
+### Transaction Flow
+
+1. **Session Start:**
+   - User initiates video/voice call or chat
+   - System checks wallet balance via `canStartSession()`
+   - Requires minimum 2 minutes worth of balance
+   - Session starts if balance is sufficient
+
+2. **During Session:**
+   - BillingTimerService runs every minute
+   - Checks current balance before deduction
+   - Calls `deductMoney()` to create DEBIT transaction
+   - Updates user with remaining balance
+   - Stops session if balance is insufficient
+
+3. **Session End:**
+   - Timer stops
+   - Final balance is retrieved
+   - Session summary is generated
+   - Backend session is ended via webhook
+
+### Error Handling
+
+- **Insufficient Balance:** Session stops immediately, user is notified
+- **Deduction Failure:** Timer stops to prevent further charges
+- **Network Error:** Session stops to protect user from unexpected charges
+- **Balance Check Failure:** Session is prevented from starting
+- **Backend Billing Tracking Failure:** Non-critical, session continues normally
+
+### Backend Billing Session Endpoints (Optional)
+
+The following endpoints are used for backend session tracking but are optional:
+- `POST /api/billing/session/start` - Track session start
+- `POST /api/billing/session/end` - Track session end
+- `GET /api/billing/session/{sessionId}/status` - Check session status
+
+If these endpoints are not available or fail:
+- The app will log warnings instead of errors
+- Sessions will continue to work normally
+- Wallet deductions will still occur via the wallet API
+- Only the backend tracking/analytics will be unavailable
+
+### Example Usage
+
+```typescript
+// Check if user can start a video call
+const check = await WalletService.canStartSession(userId, 'VIDEO_CALL');
+if (!check.canStart) {
+  Alert.alert('Insufficient Balance', check.message);
+  return;
+}
+
+// Start billing timer
+BillingTimerService.startTimer({
+  sessionId: 'session-123',
+  userId: userId,
+  mentorId: mentorId,
+  sessionType: 'VIDEO_CALL',
+  ratePerMinute: 17.00,
+  onMinuteComplete: (minutes, deducted, remaining) => {
+    console.log(`Minute ${minutes}: ₹${deducted} deducted, ₹${remaining} remaining`);
+  },
+  onInsufficientBalance: (minutes, total) => {
+    Alert.alert('Insufficient Balance', 'Please add money to continue');
+  },
+  onSessionEnd: (summary) => {
+    console.log('Session ended:', summary);
+  }
+});
+
+// End session when call ends
+await BillingTimerService.endSession('session-123', 'NORMAL_END');
+```
