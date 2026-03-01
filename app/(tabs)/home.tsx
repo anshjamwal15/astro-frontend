@@ -188,12 +188,20 @@ export default function HomeScreen() {
             <Text style={styles.greeting}>Hello, {firstName}!</Text>
             <Text style={styles.subGreeting}>Welcome to ADVIJR</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.profileButton}
-            onPress={() => router.push('/(tabs)/profile')}
-          >
-            <Ionicons name="person" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={styles.walletButton}
+              onPress={() => router.push('/(tabs)/wallet')}
+            >
+              <Ionicons name="wallet" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.profileButton}
+              onPress={() => router.push('/(tabs)/profile')}
+            >
+              <Ionicons name="person" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
         
         {/* Search Bar */}
@@ -377,6 +385,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#4CAF50',
     fontWeight: '500',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  walletButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileButton: {
     width: 40,

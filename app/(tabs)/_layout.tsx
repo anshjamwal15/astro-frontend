@@ -102,6 +102,10 @@ export default function TabLayout() {
         name="categories"
         options={{ href: null }}
       />
+      <Tabs.Screen
+        name="wallet"
+        options={{ href: null }}
+      />
     </Tabs>
   );
 }
