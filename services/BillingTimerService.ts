@@ -71,14 +71,14 @@ export class BillingTimerService {
     const amountToDeduct = config.ratePerMinute;
 
     console.log(`⏰ Minute ${session.minutesPassed} completed for session ${sessionId}`);
-    console.log(`💰 Deducting ₹${amountToDeduct} from wallet`);
+    console.log(`💰 Attempting to deduct ₹${amountToDeduct} from wallet for user ${config.userId}`);
 
     try {
-      // Get current balance
+      // Get current balance BEFORE deduction
       const balanceInfo = await WalletService.getBalance(config.userId);
       const currentBalance = balanceInfo.balance;
 
-      console.log(`Current balance: ₹${currentBalance}`);
+      console.log(`📊 Current balance BEFORE deduction: ₹${currentBalance}`);
 
       // Check if user has sufficient balance
       if (currentBalance < amountToDeduct) {
@@ -93,6 +93,12 @@ export class BillingTimerService {
       }
 
       // Deduct the amount from wallet (creates DEBIT transaction)
+      console.log(`🔄 Calling WalletService.deductMoney with:`, {
+        userId: config.userId,
+        amount: amountToDeduct,
+        sessionType: config.sessionType,
+      });
+
       const updatedBalance = await WalletService.deductMoney(
         config.userId, 
         amountToDeduct, 
@@ -102,15 +108,22 @@ export class BillingTimerService {
       session.totalDeducted += amountToDeduct;
       const remainingBalance = updatedBalance.balance;
 
-      console.log(`✅ Deducted ₹${amountToDeduct}. Remaining: ₹${remainingBalance}`);
+      console.log(`✅ Successfully deducted ₹${amountToDeduct}. New balance: ₹${remainingBalance}`);
 
       // Notify about minute completion
       config.onMinuteComplete(session.minutesPassed, amountToDeduct, remainingBalance);
 
-    } catch (error) {
-      console.error('Error processing minute tick:', error);
+    } catch (error: any) {
+      console.error('❌ Error processing minute tick:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+      });
+      
       // Stop timer on deduction error to prevent further charges
       this.stopTimer(sessionId);
+      
+      // Notify about the error
       config.onInsufficientBalance(session.minutesPassed, session.totalDeducted);
     }
   }

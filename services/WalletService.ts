@@ -81,14 +81,27 @@ export class WalletService {
   // Deduct money from wallet for calls/chat (creates DEBIT transaction)
   static async deductMoney(userId: string, amount: number, sessionType: 'AUDIO_CALL' | 'VIDEO_CALL' | 'CHAT'): Promise<WalletBalance> {
     try {
-      const result = await WalletApiService.deductMoney(amount, sessionType, ensureUUID(userId));
+      const uuidUserId = ensureUUID(userId);
+      
+      console.log('💳 WalletService.deductMoney called with:', {
+        originalUserId: userId,
+        convertedUserId: uuidUserId,
+        amount: amount,
+        sessionType: sessionType,
+      });
+
+      const result = await WalletApiService.deductMoney(amount, sessionType, uuidUserId);
+      
+      console.log('✅ WalletService.deductMoney result:', result);
+      
       return {
         userId: result.userId,
         balance: result.balance,
         currency: 'INR'
       };
     } catch (error: any) {
-      console.error('Error deducting money from wallet:', error);
+      console.error('❌ WalletService.deductMoney error:', error);
+      console.error('Error message:', error.message);
       throw new Error(`Failed to deduct money: ${error.message}`);
     }
   }

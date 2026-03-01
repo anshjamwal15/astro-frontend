@@ -171,45 +171,102 @@ export class WalletApiService {
   }
 
   /**
-   * Deduct money from wallet (creates a DEBIT transaction)
+   * Deduct money from wallet using the /api/wallet/update endpoint
    * Used for video calls, voice calls, and chat sessions
+   * 
+   * API Spec:
+   * PUT /api/wallet/update
+   * Body: { userId: string, amount: number (negative for deduction), reason: string }
+   * Response: { walletId: string, userId: string, balance: number }
    */
   static async deductMoney(amount: number, reference: string, userId?: string): Promise<AddMoneyResponse> {
     try {
-      const jwtToken = await this.getJwtToken();
-      
-      const response = await fetch(`${AUTH_CONFIG.API.BASE_URL}/api/wallet/deduct-money`, {
-        method: 'POST',
-        headers: {
-          'accept': 'application/json',
-          'Content-Type': 'application/json',
-          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
-        },
-        body: JSON.stringify({
-          ...(userId && { userId }),
-          amount,
-          method: reference, // Reference like "VIDEO_CALL", "AUDIO_CALL", "CHAT"
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to deduct money: ${response.statusText} - ${errorText}`);
+      if (!userId) {
+        throw new Error('userId is required for deducting money');
       }
 
-      const data: any = await response.json();
+      const jwtToken = await this.getJwtToken();
       
-      // Transform snake_case to camelCase
-      const transformedData: AddMoneyResponse = {
-        userId: data.userId || data.user_id,
-        balance: data.balance,
-        createdAt: data.createdAt || data.created_at,
-        updatedAt: data.updatedAt || data.updated_at,
+      // Use negative amount to deduct (e.g., -34 to deduct ₹34)
+      const deductAmount = -Math.abs(amount);
+      
+      const requestBody = {
+        userId: userId,
+        amount: deductAmount,
+        reason: reference,
       };
+
+      console.log('🔄 API Request:', {
+        url: `${AUTH_CONFIG.API.BASE_URL}/api/wallet/update`,
+        method: 'PUT',
+        body: requestBody,
+      });
       
-      return transformedData;
-    } catch (error) {
-      console.error('Error deducting money from wallet:', error);
+      const response = await fetch(`${AUTH_CONFIG.API.BASE_URL}/api/wallet/update`, {
+        method: 'PUT',
+        headers: {
+          'accept': 'application/hal+json',
+          'Content-Type': 'application/json',
+          'X-API-Key': AUTH_CONFIG.API.API_KEY,
+          'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
+          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log('📡 API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
+      // Read response body once
+      const responseText = await response.text();
+      console.log('📄 Response body:', responseText);
+
+      if (!response.ok) {
+        let errorData: any = null;
+        
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          // Not JSON
+        }
+
+        console.error('❌ API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: responseText,
+          parsed: errorData,
+        });
+        
+        const errorMessage = errorData?.message || errorData?.error || responseText || response.statusText;
+        throw new Error(`Wallet update failed (${response.status}): ${errorMessage}`);
+      }
+
+      // Parse the successful response
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('❌ Failed to parse response JSON:', responseText);
+        throw new Error('Invalid JSON response from wallet API');
+      }
+
+      console.log('✅ Wallet updated:', data);
+      
+      // Transform response to match expected format
+      return {
+        userId: data.userId || userId,
+        balance: data.balance !== undefined ? data.balance : 0,
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      };
+    } catch (error: any) {
+      console.error('❌ deductMoney error:', {
+        name: error.name,
+        message: error.message,
+      });
       throw error;
     }
   }
