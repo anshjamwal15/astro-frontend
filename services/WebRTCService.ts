@@ -67,31 +67,55 @@ export class WebRTCService {
     this.roomName = roomName;
     this.isHost = isHost;
 
+    console.log('========================================');
+    console.log('🚀 Starting call...');
+    console.log(`Room: ${roomName}`);
+    console.log(`Role: ${isHost ? 'HOST' : 'GUEST'}`);
+    console.log(`Mode: ${isVoiceOnly ? 'VOICE ONLY' : 'VIDEO'}`);
+    console.log('========================================');
+
     try {
       // Step 1: Get user media
+      console.log('Step 1: Getting user media...');
       await this.getUserMedia(isVoiceOnly);
+      console.log('✅ User media obtained');
 
       // Step 2: Create peer connection
+      console.log('Step 2: Creating peer connection...');
       this.createPeerConnection();
+      console.log('✅ Peer connection created');
 
       // Step 3: Add local stream to peer connection
       if (this.localStream) {
+        console.log('Step 3: Adding local tracks to peer connection...');
         this.localStream.getTracks().forEach(track => {
+          console.log(`Adding ${track.kind} track:`, track.id);
           this.peerConnection?.addTrack(track, this.localStream!);
         });
+        console.log('✅ Local tracks added');
       }
 
       // Step 4: Setup Firestore listeners for signaling
+      console.log('Step 4: Setting up Firestore listeners...');
       this.setupFirestoreListeners();
+      console.log('✅ Firestore listeners set up');
 
       // Step 5: If host, create offer
       if (isHost) {
+        console.log('Step 5: Creating offer (HOST)...');
         await this.createOffer();
+        console.log('✅ Offer created');
+      } else {
+        console.log('Step 5: Waiting for offer (GUEST)...');
       }
+
+      console.log('========================================');
+      console.log('✅ Call initialization complete');
+      console.log('========================================');
 
       return true;
     } catch (error) {
-      console.error('Error starting call:', error);
+      console.error('❌ Error starting call:', error);
       throw error;
     }
   }
@@ -99,26 +123,32 @@ export class WebRTCService {
   private async getUserMedia(isVoiceOnly: boolean) {
     const mediaConstraints = {
       audio: true,
-      video: {
-        frameRate: 30,
+      video: isVoiceOnly ? false : {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 },
         facingMode: 'user',
       },
     };
 
     try {
+      console.log('📹 Requesting media with constraints:', JSON.stringify(mediaConstraints, null, 2));
       const mediaStream = await mediaDevices.getUserMedia(mediaConstraints);
       
-      if (isVoiceOnly) {
-        const videoTrack = mediaStream.getVideoTracks()[0];
-        if (videoTrack) {
-          videoTrack.enabled = false;
-        }
-      }
+      console.log('✅ Media stream obtained');
+      console.log('Audio tracks:', mediaStream.getAudioTracks().length);
+      console.log('Video tracks:', mediaStream.getVideoTracks().length);
+      
+      mediaStream.getTracks().forEach(track => {
+        console.log(`Track: ${track.kind} - ${track.label} - enabled: ${track.enabled}`);
+      });
 
       this.localStream = mediaStream;
       this.onLocalStream?.(mediaStream);
+      
+      console.log('✅ Local stream ready');
     } catch (error) {
-      console.error('Error getting user media:', error);
+      console.error('❌ Error getting user media:', error);
       throw error;
     }
   }
@@ -132,8 +162,8 @@ export class WebRTCService {
       console.log('Connection state:', state);
       this.onConnectionStateChange?.(state || 'unknown');
 
-      if (state === 'closed') {
-        this.cleanup();
+      if (state === 'closed' || state === 'failed') {
+        console.log('Connection closed or failed, cleaning up');
       }
     });
 
@@ -144,6 +174,7 @@ export class WebRTCService {
         return;
       }
 
+      console.log('New ICE candidate:', event.candidate.candidate);
       // Send candidate to Firestore
       this.sendIceCandidate(event.candidate);
     });
@@ -161,21 +192,26 @@ export class WebRTCService {
       this.onIceConnectionStateChange?.(state || 'unknown');
 
       if (state === 'connected' || state === 'completed') {
-        console.log('Call connected successfully');
+        console.log('✅ Call connected successfully');
       } else if (state === 'failed') {
-        console.error('ICE connection failed - may need TURN server');
+        console.error('❌ ICE connection failed - may need TURN server');
+      } else if (state === 'disconnected') {
+        console.warn('⚠️ ICE connection disconnected');
       }
     });
 
     // Track event (remote stream)
     (this.peerConnection as any).addEventListener('track', (event: any) => {
-      console.log('Remote track received');
+      console.log('🎥 Remote track received:', event.track.kind);
       
       if (!this.remoteStream) {
         this.remoteStream = new MediaStream();
       }
       
       this.remoteStream.addTrack(event.track);
+      
+      // Notify about remote stream
+      console.log('📺 Remote stream updated, total tracks:', this.remoteStream.getTracks().length);
       this.onRemoteStream?.(this.remoteStream);
     });
 
@@ -186,14 +222,23 @@ export class WebRTCService {
   }
 
   private async createOffer() {
-    if (!this.peerConnection) return;
+    if (!this.peerConnection) {
+      console.error('❌ No peer connection available for offer');
+      return;
+    }
 
     try {
+      console.log('📝 Creating offer...');
       const offerDescription = await this.peerConnection.createOffer(this.sessionConstraints);
+      console.log('✅ Offer created');
+      
+      console.log('📝 Setting local description...');
       await this.peerConnection.setLocalDescription(offerDescription);
+      console.log('✅ Local description set');
 
       // Save offer to Firestore
       if (firebaseFirestore && firestoreDoc && firestoreSetDoc) {
+        console.log('💾 Saving offer to Firestore...');
         const roomRef = firestoreDoc(firebaseFirestore, 'rooms', this.roomName);
         await firestoreSetDoc(roomRef, {
           offer: {
@@ -202,24 +247,31 @@ export class WebRTCService {
           },
           createdAt: new Date().toISOString(),
         });
+        console.log('✅ Offer saved to Firestore');
       }
 
-      console.log('Offer created and saved');
+      console.log('✅ Offer created and saved successfully');
     } catch (error) {
-      console.error('Error creating offer:', error);
+      console.error('❌ Error creating offer:', error);
       throw error;
     }
   }
 
   private async createAnswer(offerDescription: any) {
-    if (!this.peerConnection) return;
+    if (!this.peerConnection) {
+      console.error('❌ No peer connection available for answer');
+      return;
+    }
 
     try {
+      console.log('📝 Creating answer for offer');
       const offer = new RTCSessionDescription(offerDescription);
       await this.peerConnection.setRemoteDescription(offer);
+      console.log('✅ Remote description (offer) set');
 
       const answerDescription = await this.peerConnection.createAnswer();
       await this.peerConnection.setLocalDescription(answerDescription);
+      console.log('✅ Local description (answer) set');
 
       // Save answer to Firestore
       if (firebaseFirestore && firestoreDoc && firestoreUpdateDoc) {
@@ -230,41 +282,56 @@ export class WebRTCService {
             sdp: answerDescription.sdp,
           },
         });
+        console.log('✅ Answer saved to Firestore');
       }
 
       // Process any queued candidates
       this.processCandidates();
 
-      console.log('Answer created and saved');
+      console.log('✅ Answer created and saved successfully');
     } catch (error) {
-      console.error('Error creating answer:', error);
+      console.error('❌ Error creating answer:', error);
       throw error;
     }
   }
 
   private async handleRemoteCandidate(candidateData: any) {
-    const candidate = new RTCIceCandidate(candidateData);
-
-    if (!this.peerConnection?.remoteDescription) {
-      this.remoteCandidates.push(candidate);
-      return;
-    }
-
     try {
+      const candidate = new RTCIceCandidate(candidateData);
+
+      if (!this.peerConnection?.remoteDescription) {
+        console.log('🔄 Queuing ICE candidate (no remote description yet)');
+        this.remoteCandidates.push(candidate);
+        return;
+      }
+
+      console.log('➕ Adding ICE candidate');
       await this.peerConnection.addIceCandidate(candidate);
+      console.log('✅ ICE candidate added successfully');
     } catch (error) {
-      console.error('Error adding ICE candidate:', error);
+      console.error('❌ Error adding ICE candidate:', error);
     }
   }
 
-  private processCandidates() {
-    if (this.remoteCandidates.length < 1) return;
+  private async processCandidates() {
+    if (this.remoteCandidates.length < 1) {
+      console.log('No queued candidates to process');
+      return;
+    }
 
-    this.remoteCandidates.forEach(candidate => {
-      this.peerConnection?.addIceCandidate(candidate);
-    });
+    console.log(`📦 Processing ${this.remoteCandidates.length} queued ICE candidates`);
+    
+    for (const candidate of this.remoteCandidates) {
+      try {
+        await this.peerConnection?.addIceCandidate(candidate);
+        console.log('✅ Queued candidate added');
+      } catch (error) {
+        console.error('❌ Error adding queued candidate:', error);
+      }
+    }
 
     this.remoteCandidates = [];
+    console.log('✅ All queued candidates processed');
   }
 
   private async sendIceCandidate(candidate: RTCIceCandidate) {
@@ -289,7 +356,7 @@ export class WebRTCService {
 
   private setupFirestoreListeners() {
     if (!firebaseFirestore || !firestoreDoc || !firestoreCollection || !firestoreOnSnapshot) {
-      console.error('Firestore not available');
+      console.error('❌ Firestore not available');
       return;
     }
 
@@ -297,23 +364,36 @@ export class WebRTCService {
 
     // Listen for offer (if guest)
     if (!this.isHost) {
+      console.log('👂 Guest: Listening for offer...');
       firestoreOnSnapshot(roomRef, (snapshot: any) => {
         const data = snapshot.data();
         if (data?.offer && !this.peerConnection?.remoteDescription) {
+          console.log('📨 Offer received, creating answer...');
           this.createAnswer(data.offer);
         }
+      }, (error: any) => {
+        console.error('❌ Error listening for offer:', error);
       });
     }
 
     // Listen for answer (if host)
     if (this.isHost) {
+      console.log('👂 Host: Listening for answer...');
       firestoreOnSnapshot(roomRef, async (snapshot: any) => {
         const data = snapshot.data();
         if (data?.answer && !this.peerConnection?.remoteDescription) {
-          const answer = new RTCSessionDescription(data.answer);
-          await this.peerConnection?.setRemoteDescription(answer);
-          this.processCandidates();
+          try {
+            console.log('📨 Answer received, setting remote description...');
+            const answer = new RTCSessionDescription(data.answer);
+            await this.peerConnection?.setRemoteDescription(answer);
+            console.log('✅ Remote description (answer) set');
+            await this.processCandidates();
+          } catch (error) {
+            console.error('❌ Error setting answer:', error);
+          }
         }
+      }, (error: any) => {
+        console.error('❌ Error listening for answer:', error);
       });
     }
 
@@ -321,12 +401,16 @@ export class WebRTCService {
     const remoteCandidatesCollection = this.isHost ? 'guestCandidates' : 'hostCandidates';
     const candidatesRef = firestoreCollection(roomRef, remoteCandidatesCollection);
     
+    console.log(`👂 Listening for ICE candidates from: ${remoteCandidatesCollection}`);
     firestoreOnSnapshot(candidatesRef, (snapshot: any) => {
       snapshot.docChanges().forEach((change: any) => {
         if (change.type === 'added') {
+          console.log('📨 New ICE candidate received');
           this.handleRemoteCandidate(change.doc.data());
         }
       });
+    }, (error: any) => {
+      console.error('❌ Error listening for ICE candidates:', error);
     });
   }
 
@@ -366,9 +450,14 @@ export class WebRTCService {
   }
 
   async endCall() {
+    console.log('🔚 Ending call...');
+    
     // Stop all tracks
     if (this.localStream) {
-      this.localStream.getTracks().forEach(track => track.stop());
+      this.localStream.getTracks().forEach(track => {
+        track.stop();
+        console.log(`Stopped ${track.kind} track`);
+      });
       this.localStream = null;
     }
 
@@ -376,6 +465,7 @@ export class WebRTCService {
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = null;
+      console.log('Peer connection closed');
     }
 
     // Clean up Firestore (if host)
@@ -383,12 +473,14 @@ export class WebRTCService {
       try {
         const roomRef = firestoreDoc(firebaseFirestore, 'rooms', this.roomName);
         await firestoreDeleteDoc(roomRef);
+        console.log('Room cleaned up from Firestore');
       } catch (error) {
         console.error('Error cleaning up room:', error);
       }
     }
 
     this.cleanup();
+    console.log('✅ Call ended successfully');
   }
 
   private cleanup() {
