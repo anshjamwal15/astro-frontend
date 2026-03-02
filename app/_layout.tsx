@@ -8,6 +8,7 @@ import { useColorScheme } from '../hooks/use-color-scheme';
 import { UserProvider } from '../contexts/UserContext';
 import { MentorProvider } from '../contexts/MentorContext';
 import PushNotificationService from '../services/PushNotificationService';
+import { initNetworkLogger } from '../utils/NetworkLogger';
 
 export const unstable_settings = {
   // Ensure initial route name is set correctly
@@ -18,6 +19,9 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
+    // Initialize network logger (uses config from config/networkLogger.config.ts)
+    initNetworkLogger();
+
     // Initialize push notification service
     const initPushNotifications = async () => {
       try {
