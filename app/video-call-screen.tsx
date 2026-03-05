@@ -174,60 +174,74 @@ export default function VideoCallScreen() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const startBillingTimer = () => {
+  const startBillingTimer = async () => {
     if (!sessionId || !user || !mentorId) return;
 
     console.log(`Starting video call billing timer: ₹${ratePerMinute}/min`);
 
-    BillingTimerService.startTimer({
-      sessionId,
-      userId: user.id,
-      mentorId,
-      sessionType: 'VIDEO_CALL',
-      ratePerMinute,
-      onMinuteComplete: (minutes, amountDeducted, remainingBalance) => {
-        console.log(`Video call minute ${minutes} completed. Deducted: ₹${amountDeducted}`);
-        setMinutesPassed(minutes);
-        setCurrentBalance(remainingBalance);
-        
-        // Show continue dialog
-        BillingTimerService.showContinueDialog(
-          minutes,
-          amountDeducted,
-          remainingBalance,
-          () => {
-            console.log('User chose to continue video call');
-            // Continue - do nothing, timer will keep running
+    try {
+      await BillingTimerService.startTimer({
+        sessionId,
+        userId: user.id,
+        mentorId,
+        sessionType: 'VIDEO_CALL',
+        ratePerMinute,
+        onMinuteComplete: (minutes, amountDeducted, remainingBalance) => {
+          console.log(`Video call minute ${minutes} completed. Deducted: ₹${amountDeducted} (local)`);
+          setMinutesPassed(minutes);
+          setCurrentBalance(remainingBalance);
+          
+          // Show continue dialog
+          BillingTimerService.showContinueDialog(
+            minutes,
+            amountDeducted,
+            remainingBalance,
+            () => {
+              console.log('User chose to continue video call');
+              // Continue - do nothing, timer will keep running
+            },
+            () => {
+              console.log('User chose to cancel video call');
+              handleEndCall(true, 'USER_CANCELLED');
+            }
+          );
+        },
+        onInsufficientBalance: (minutes, totalCost) => {
+          console.log(`Insufficient balance after ${minutes} minutes of video call`);
+          setMinutesPassed(minutes);
+          
+          // Show insufficient balance dialog
+          BillingTimerService.showInsufficientBalanceDialog(
+            minutes,
+            totalCost,
+            () => {
+              // Navigate to add money
+              Alert.alert('Add Money', 'Please use the wallet section to add money.');
+              handleEndCall(true, 'INSUFFICIENT_BALANCE');
+            },
+            () => {
+              // Cancel - end session
+              handleEndCall(true, 'INSUFFICIENT_BALANCE');
+            }
+          );
+        },
+        onSessionEnd: (summary) => {
+          console.log('Video call session ended:', summary);
+        },
+      });
+    } catch (error: any) {
+      console.error('Failed to start billing timer:', error);
+      Alert.alert(
+        'Wallet Error',
+        error.message || 'Failed to initialize billing. Please check your wallet balance.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
           },
-          () => {
-            console.log('User chose to cancel video call');
-            handleEndCall(true, 'USER_CANCELLED');
-          }
-        );
-      },
-      onInsufficientBalance: (minutes, totalCost) => {
-        console.log(`Insufficient balance after ${minutes} minutes of video call`);
-        setMinutesPassed(minutes);
-        
-        // Show insufficient balance dialog
-        BillingTimerService.showInsufficientBalanceDialog(
-          minutes,
-          totalCost,
-          () => {
-            // Navigate to add money
-            Alert.alert('Add Money', 'Please use the wallet section to add money.');
-            handleEndCall(true, 'INSUFFICIENT_BALANCE');
-          },
-          () => {
-            // Cancel - end session
-            handleEndCall(true, 'INSUFFICIENT_BALANCE');
-          }
-        );
-      },
-      onSessionEnd: (summary) => {
-        console.log('Video call session ended:', summary);
-      },
-    });
+        ]
+      );
+    }
   };
 
   const handleEndCall = async (skipConfirmation: boolean = false, reason: 'USER_CANCELLED' | 'INSUFFICIENT_BALANCE' | 'NORMAL_END' = 'NORMAL_END') => {
@@ -343,7 +357,7 @@ export default function VideoCallScreen() {
           <Ionicons name="home" size={20} color="#fff" />
           <Text style={styles.roomName}>{roomName}</Text>
         </View>
-        {isConnected && (
+        {/* {isConnected && (
           <View style={styles.durationContainer}>
             <View style={styles.recordingIndicator} />
             <Text style={styles.durationText}>{formatDuration(callDuration)}</Text>
@@ -351,7 +365,7 @@ export default function VideoCallScreen() {
               <Text style={styles.billingText}>₹{ratePerMinute}/min • {minutesPassed}m</Text>
             )}
           </View>
-        )}
+        )} */}
       </View>
 
       {/* Bottom Controls */}

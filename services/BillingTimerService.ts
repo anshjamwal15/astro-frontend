@@ -26,23 +26,39 @@ export class BillingTimerService {
     startTime: number;
     minutesPassed: number;
     totalDeducted: number;
+    initialBalance: number;
+    currentBalance: number;
     config: BillingTimerConfig;
   }> = new Map();
 
   /**
    * Start a billing timer for a session
    */
-  static startTimer(config: BillingTimerConfig): void {
-    const { sessionId } = config;
+  static async startTimer(config: BillingTimerConfig): Promise<void> {
+    const { sessionId, userId } = config;
 
     // Clear any existing timer for this session
     this.stopTimer(sessionId);
 
-    // Initialize session data
+    // Fetch initial wallet balance
+    console.log(`💰 Fetching initial wallet balance for user ${userId}`);
+    let initialBalance = 0;
+    try {
+      const balanceInfo = await WalletService.getBalance(userId);
+      initialBalance = balanceInfo.balance;
+      console.log(`✅ Initial balance: ₹${initialBalance}`);
+    } catch (error) {
+      console.error('❌ Failed to fetch initial balance:', error);
+      throw new Error('Failed to fetch wallet balance. Please try again.');
+    }
+
+    // Initialize session data with wallet info
     this.sessionData.set(sessionId, {
       startTime: Date.now(),
       minutesPassed: 0,
       totalDeducted: 0,
+      initialBalance,
+      currentBalance: initialBalance,
       config,
     });
 
@@ -57,7 +73,7 @@ export class BillingTimerService {
   }
 
   /**
-   * Handle each minute tick
+   * Handle each minute tick - only updates local state, no API calls
    */
   private static async onMinuteTick(sessionId: string): Promise<void> {
     const session = this.sessionData.get(sessionId);
@@ -71,61 +87,28 @@ export class BillingTimerService {
     const amountToDeduct = config.ratePerMinute;
 
     console.log(`⏰ Minute ${session.minutesPassed} completed for session ${sessionId}`);
-    console.log(`💰 Attempting to deduct ₹${amountToDeduct} from wallet for user ${config.userId}`);
+    console.log(`💰 Deducting ₹${amountToDeduct} from local wallet state`);
 
-    try {
-      // Get current balance BEFORE deduction
-      const balanceInfo = await WalletService.getBalance(config.userId);
-      const currentBalance = balanceInfo.balance;
-
-      console.log(`📊 Current balance BEFORE deduction: ₹${currentBalance}`);
-
-      // Check if user has sufficient balance
-      if (currentBalance < amountToDeduct) {
-        console.warn(`⚠️ Insufficient balance: ₹${currentBalance} < ₹${amountToDeduct}`);
-        
-        // Stop the timer
-        this.stopTimer(sessionId);
-        
-        // Notify about insufficient balance
-        config.onInsufficientBalance(session.minutesPassed, session.totalDeducted);
-        return;
-      }
-
-      // Deduct the amount from wallet (creates DEBIT transaction)
-      console.log(`🔄 Calling WalletService.deductMoney with:`, {
-        userId: config.userId,
-        amount: amountToDeduct,
-        sessionType: config.sessionType,
-      });
-
-      const updatedBalance = await WalletService.deductMoney(
-        config.userId, 
-        amountToDeduct, 
-        config.sessionType
-      );
+    // Check if user has sufficient balance in local state
+    if (session.currentBalance < amountToDeduct) {
+      console.warn(`⚠️ Insufficient balance: ₹${session.currentBalance} < ₹${amountToDeduct}`);
       
-      session.totalDeducted += amountToDeduct;
-      const remainingBalance = updatedBalance.balance;
-
-      console.log(`✅ Successfully deducted ₹${amountToDeduct}. New balance: ₹${remainingBalance}`);
-
-      // Notify about minute completion
-      config.onMinuteComplete(session.minutesPassed, amountToDeduct, remainingBalance);
-
-    } catch (error: any) {
-      console.error('❌ Error processing minute tick:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-      });
-      
-      // Stop timer on deduction error to prevent further charges
+      // Stop the timer
       this.stopTimer(sessionId);
       
-      // Notify about the error
+      // Notify about insufficient balance
       config.onInsufficientBalance(session.minutesPassed, session.totalDeducted);
+      return;
     }
+
+    // Update local state only (no API call)
+    session.currentBalance -= amountToDeduct;
+    session.totalDeducted += amountToDeduct;
+
+    console.log(`✅ Local balance updated. New balance: ₹${session.currentBalance}`);
+
+    // Notify about minute completion
+    config.onMinuteComplete(session.minutesPassed, amountToDeduct, session.currentBalance);
   }
 
   /**
@@ -141,7 +124,7 @@ export class BillingTimerService {
   }
 
   /**
-   * End the session and get summary
+   * End the session and deduct total amount from wallet (single API call)
    */
   static async endSession(
     sessionId: string,
@@ -162,15 +145,29 @@ export class BillingTimerService {
       };
     }
 
-    const { config, minutesPassed, totalDeducted } = session;
+    const { config, minutesPassed, totalDeducted, currentBalance } = session;
 
-    // Get final balance
-    let remainingBalance = 0;
-    try {
-      const balanceInfo = await WalletService.getBalance(config.userId);
-      remainingBalance = balanceInfo.balance;
-    } catch (error) {
-      console.error('Error getting final balance:', error);
+    console.log(`💳 Ending session ${sessionId}. Total to deduct: ₹${totalDeducted}`);
+
+    // Deduct total amount from wallet in a single API call
+    let remainingBalance = currentBalance;
+    if (totalDeducted > 0) {
+      try {
+        console.log(`🔄 Deducting total amount ₹${totalDeducted} from wallet`);
+        const updatedBalance = await WalletService.deductMoney(
+          config.userId,
+          currentBalance - totalDeducted,
+          config.sessionType
+        );
+        remainingBalance = updatedBalance.balance;
+        console.log(`✅ Successfully deducted ₹${totalDeducted}. Final balance: ₹${remainingBalance}`);
+      } catch (error) {
+        console.error('❌ Error deducting final amount:', error);
+        // Use local balance as fallback
+        remainingBalance = currentBalance;
+      }
+    } else {
+      console.log(`ℹ️ No amount to deduct (session duration: 0 minutes)`);
     }
 
     // Clean up session data
@@ -189,7 +186,6 @@ export class BillingTimerService {
     config.onSessionEnd(summary);
 
     // End the billing session on the backend (optional - for tracking purposes)
-    // This is not critical, so we just log warnings if it fails
     try {
       await WalletService.endSession(sessionId, endReason);
       console.log(`✅ Backend session ${sessionId} ended successfully`);

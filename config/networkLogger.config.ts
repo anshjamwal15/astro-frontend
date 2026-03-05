@@ -23,6 +23,7 @@ export const NETWORK_LOGGER_CONFIG = {
   
   // URLs to exclude from logging (regex patterns)
   excludeUrls: [
+    /\/symbolicate$/,  // Ignore React Native symbolicate endpoint
     // Example: /analytics/,
     // Example: /tracking/,
   ] as RegExp[],

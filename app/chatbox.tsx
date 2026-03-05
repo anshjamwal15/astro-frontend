@@ -83,62 +83,76 @@ export default function ChatBoxScreen() {
     }
   };
 
-  const startBillingTimer = () => {
+  const startBillingTimer = async () => {
     if (!sessionId || !user || !astrologerId || !ratePerMinute) return;
 
     const rate = parseFloat(ratePerMinute as string);
     
     console.log(`Starting billing timer: ₹${rate}/min`);
 
-    BillingTimerService.startTimer({
-      sessionId: sessionId as string,
-      userId: user.id,
-      mentorId: astrologerId as string,
-      sessionType: 'CHAT',
-      ratePerMinute: rate,
-      onMinuteComplete: (minutes, amountDeducted, remainingBalance) => {
-        console.log(`Minute ${minutes} completed. Deducted: ₹${amountDeducted}`);
-        setMinutesPassed(minutes);
-        setCurrentBalance(remainingBalance);
-        
-        // Show continue dialog
-        BillingTimerService.showContinueDialog(
-          minutes,
-          amountDeducted,
-          remainingBalance,
-          () => {
-            console.log('User chose to continue');
-            // Continue - do nothing, timer will keep running
+    try {
+      await BillingTimerService.startTimer({
+        sessionId: sessionId as string,
+        userId: user.id,
+        mentorId: astrologerId as string,
+        sessionType: 'CHAT',
+        ratePerMinute: rate,
+        onMinuteComplete: (minutes, amountDeducted, remainingBalance) => {
+          console.log(`Minute ${minutes} completed. Deducted: ₹${amountDeducted} (local)`);
+          setMinutesPassed(minutes);
+          setCurrentBalance(remainingBalance);
+          
+          // Show continue dialog
+          BillingTimerService.showContinueDialog(
+            minutes,
+            amountDeducted,
+            remainingBalance,
+            () => {
+              console.log('User chose to continue');
+              // Continue - do nothing, timer will keep running
+            },
+            () => {
+              console.log('User chose to cancel');
+              endChatSession('USER_CANCELLED');
+            }
+          );
+        },
+        onInsufficientBalance: (minutes, totalCost) => {
+          console.log(`Insufficient balance after ${minutes} minutes`);
+          setMinutesPassed(minutes);
+          
+          // Show insufficient balance dialog
+          BillingTimerService.showInsufficientBalanceDialog(
+            minutes,
+            totalCost,
+            () => {
+              // Navigate to add money
+              Alert.alert('Add Money', 'Please use the wallet section to add money.');
+              endChatSession('INSUFFICIENT_BALANCE');
+            },
+            () => {
+              // Cancel - end session
+              endChatSession('INSUFFICIENT_BALANCE');
+            }
+          );
+        },
+        onSessionEnd: (summary) => {
+          console.log('Session ended:', summary);
+        },
+      });
+    } catch (error: any) {
+      console.error('Failed to start billing timer:', error);
+      Alert.alert(
+        'Wallet Error',
+        error.message || 'Failed to initialize billing. Please check your wallet balance.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
           },
-          () => {
-            console.log('User chose to cancel');
-            endChatSession('USER_CANCELLED');
-          }
-        );
-      },
-      onInsufficientBalance: (minutes, totalCost) => {
-        console.log(`Insufficient balance after ${minutes} minutes`);
-        setMinutesPassed(minutes);
-        
-        // Show insufficient balance dialog
-        BillingTimerService.showInsufficientBalanceDialog(
-          minutes,
-          totalCost,
-          () => {
-            // Navigate to add money
-            Alert.alert('Add Money', 'Please use the wallet section to add money.');
-            endChatSession('INSUFFICIENT_BALANCE');
-          },
-          () => {
-            // Cancel - end session
-            endChatSession('INSUFFICIENT_BALANCE');
-          }
-        );
-      },
-      onSessionEnd: (summary) => {
-        console.log('Session ended:', summary);
-      },
-    });
+        ]
+      );
+    }
   };
 
   const endChatSession = async (reason: 'USER_CANCELLED' | 'INSUFFICIENT_BALANCE' | 'NORMAL_END' = 'NORMAL_END') => {

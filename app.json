@@ -11,7 +11,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dekhokaun.advijr",
-      "googleServicesFile": "./ios/ADVIJR/GoogleService-Info.plist"
+      "googleServicesFile": "./ios/ADVIJR/GoogleService-Info.plist",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to your camera for video calls.",
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone for voice and video calls."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +28,14 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.dekhokaun.advijr",
       "usesCleartextTraffic": true,
-      "googleServicesFile": "./android/app/google-services.json"
+      "googleServicesFile": "./android/app/google-services.json",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "output": "static",
@@ -55,7 +66,8 @@
         }
       ],
       "@react-native-firebase/app",
-      "@react-native-firebase/messaging"
+      "@react-native-firebase/messaging",
+      "./plugins/withWebRTC.js"
     ],
     "experiments": {
       "typedRoutes": true,

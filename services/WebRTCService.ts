@@ -5,7 +5,7 @@ import {
   MediaStream,
   mediaDevices,
 } from 'react-native-webrtc';
-import { 
+import {
   firebaseFirestore,
   firestoreDoc,
   firestoreCollection,
@@ -23,7 +23,7 @@ export class WebRTCService {
   private roomName: string = '';
   private isHost: boolean = false;
   private remoteCandidates: RTCIceCandidate[] = [];
-  
+
   // Callbacks
   public onLocalStream?: (stream: MediaStream) => void;
   public onRemoteStream?: (stream: MediaStream) => void;
@@ -32,27 +32,29 @@ export class WebRTCService {
 
   private peerConstraints = {
     iceServers: [
+      // Reliable Google STUN servers (keep these)
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
       { urls: 'stun:stun3.l.google.com:19302' },
       { urls: 'stun:stun4.l.google.com:19302' },
-      // Public TURN servers for better connectivity
+
       {
-        urls: 'turn:openrelay.metered.ca:80',
+        urls: [
+          'turn:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:443',
+          'turn:openrelay.metered.ca:443?transport=tcp'
+        ],
         username: 'openrelayproject',
         credential: 'openrelayproject',
       },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
+
+      { urls: 'stun:stunserver2025.stunprotocol.org:3478' },
+      { urls: 'turn:relay.metered.ca:80' },               
+      { urls: 'turn:relay.metered.ca:443?transport=tcp' },
+
+      { urls: 'turn:stun.evan-brass.net:3478' },
+      { urls: 'turn:stun.evan-brass.net:3478?transport=tcp' },
     ],
     iceCandidatePoolSize: 10,
   };
@@ -134,18 +136,18 @@ export class WebRTCService {
     try {
       console.log('📹 Requesting media with constraints:', JSON.stringify(mediaConstraints, null, 2));
       const mediaStream = await mediaDevices.getUserMedia(mediaConstraints);
-      
+
       console.log('✅ Media stream obtained');
       console.log('Audio tracks:', mediaStream.getAudioTracks().length);
       console.log('Video tracks:', mediaStream.getVideoTracks().length);
-      
+
       mediaStream.getTracks().forEach(track => {
         console.log(`Track: ${track.kind} - ${track.label} - enabled: ${track.enabled}`);
       });
 
       this.localStream = mediaStream;
       this.onLocalStream?.(mediaStream);
-      
+
       console.log('✅ Local stream ready');
     } catch (error) {
       console.error('❌ Error getting user media:', error);
@@ -154,7 +156,13 @@ export class WebRTCService {
   }
 
   private createPeerConnection() {
-    this.peerConnection = new RTCPeerConnection(this.peerConstraints);
+    try {
+      this.peerConnection = new RTCPeerConnection(this.peerConstraints);
+    } catch (error) {
+      console.error('❌ Failed to create RTCPeerConnection:', error);
+      console.error('Make sure you have run "npx expo prebuild" and rebuilt the native app');
+      throw error;
+    }
 
     // Connection state change
     (this.peerConnection as any).addEventListener('connectionstatechange', () => {
@@ -203,13 +211,13 @@ export class WebRTCService {
     // Track event (remote stream)
     (this.peerConnection as any).addEventListener('track', (event: any) => {
       console.log('🎥 Remote track received:', event.track.kind);
-      
+
       if (!this.remoteStream) {
         this.remoteStream = new MediaStream();
       }
-      
+
       this.remoteStream.addTrack(event.track);
-      
+
       // Notify about remote stream
       console.log('📺 Remote stream updated, total tracks:', this.remoteStream.getTracks().length);
       this.onRemoteStream?.(this.remoteStream);
@@ -231,7 +239,7 @@ export class WebRTCService {
       console.log('📝 Creating offer...');
       const offerDescription = await this.peerConnection.createOffer(this.sessionConstraints);
       console.log('✅ Offer created');
-      
+
       console.log('📝 Setting local description...');
       await this.peerConnection.setLocalDescription(offerDescription);
       console.log('✅ Local description set');
@@ -320,7 +328,7 @@ export class WebRTCService {
     }
 
     console.log(`📦 Processing ${this.remoteCandidates.length} queued ICE candidates`);
-    
+
     for (const candidate of this.remoteCandidates) {
       try {
         await this.peerConnection?.addIceCandidate(candidate);
@@ -400,7 +408,7 @@ export class WebRTCService {
     // Listen for ICE candidates
     const remoteCandidatesCollection = this.isHost ? 'guestCandidates' : 'hostCandidates';
     const candidatesRef = firestoreCollection(roomRef, remoteCandidatesCollection);
-    
+
     console.log(`👂 Listening for ICE candidates from: ${remoteCandidatesCollection}`);
     firestoreOnSnapshot(candidatesRef, (snapshot: any) => {
       snapshot.docChanges().forEach((change: any) => {
@@ -441,17 +449,26 @@ export class WebRTCService {
 
     const videoTrack = this.localStream.getVideoTracks()[0];
     if (videoTrack) {
-      // @ts-ignore - _switchCamera is available in react-native-webrtc
-      if (videoTrack._switchCamera) {
-        // @ts-ignore
-        videoTrack._switchCamera();
+      try {
+        // Modern approach for switching camera
+        // @ts-ignore - switchCamera is available in react-native-webrtc
+        if (typeof videoTrack.switchCamera === 'function') {
+          // @ts-ignore
+          await videoTrack.switchCamera();
+        } else if (typeof videoTrack._switchCamera === 'function') {
+          // Fallback to deprecated method
+          // @ts-ignore
+          videoTrack._switchCamera();
+        }
+      } catch (error) {
+        console.error('Error switching camera:', error);
       }
     }
   }
 
   async endCall() {
     console.log('🔚 Ending call...');
-    
+
     // Stop all tracks
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
