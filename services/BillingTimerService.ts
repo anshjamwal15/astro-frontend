@@ -157,7 +157,7 @@ export class BillingTimerService {
         console.log(`🔄 Deducting total amount ₹${totalDeducted} from wallet (SINGLE API CALL)`);
         const updatedBalance = await WalletService.deductMoney(
           config.userId,
-          totalDeducted,
+          currentBalance - totalDeducted,
           config.sessionType
         );
         remainingBalance = updatedBalance.balance;

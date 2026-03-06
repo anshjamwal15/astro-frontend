@@ -30,21 +30,13 @@ export class WebRTCService {
   public onConnectionStateChange?: (state: string) => void;
   public onIceConnectionStateChange?: (state: string) => void;
 
-  private peerConstraints = {
+  private peerConstraints: any = {
     iceServers: [
-      // Google STUN Servers
+      // Google STUN Servers (for NAT traversal)
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
-      { urls: "stun:stun2.l.google.com:19302" },
-      { urls: "stun:stun3.l.google.com:19302" },
-      { urls: "stun:stun4.l.google.com:19302" },
 
-      // Metered STUN
-      {
-        urls: "stun:stun.relay.metered.ca:80",
-      },
-
-      // Your Metered TURN Servers
+      // Metered TURN Servers (Primary - with credentials)
       {
         urls: "turn:standard.relay.metered.ca:80",
         username: "5c77d138613be05530a5c1ac",
@@ -66,7 +58,7 @@ export class WebRTCService {
         credential: "PiU/GFfTBxb5Efdn",
       },
 
-      // OpenRelay Public TURN Servers
+      // OpenRelay Public TURN Servers (Fallback)
       {
         urls: "turn:openrelay.metered.ca:80",
         username: "openrelayproject",
@@ -82,8 +74,14 @@ export class WebRTCService {
         username: "openrelayproject",
         credential: "openrelayproject",
       },
+
+      // Additional public STUN servers as fallback
+      { urls: "stun:stun.relay.metered.ca:80" },
     ],
     iceCandidatePoolSize: 10,
+    iceTransportPolicy: 'all', // Use both STUN and TURN
+    bundlePolicy: 'max-bundle',
+    rtcpMuxPolicy: 'require',
   };
 
   private sessionConstraints = {
@@ -199,13 +197,21 @@ export class WebRTCService {
     // ICE candidate
     (this.peerConnection as any).addEventListener('icecandidate', (event: any) => {
       if (!event.candidate) {
-        console.log('ICE gathering completed');
+        console.log('✅ ICE gathering completed');
         return;
       }
 
-      console.log('New ICE candidate:', event.candidate.candidate);
+      const candidate = event.candidate;
+      console.log('🧊 New ICE candidate:', {
+        type: candidate.type,
+        protocol: candidate.protocol,
+        address: candidate.address,
+        port: candidate.port,
+        candidate: candidate.candidate.substring(0, 50) + '...',
+      });
+      
       // Send candidate to Firestore
-      this.sendIceCandidate(event.candidate);
+      this.sendIceCandidate(candidate);
     });
 
     // ICE candidate error
@@ -215,7 +221,7 @@ export class WebRTCService {
     });
 
     // ICE connection state change
-    (this.peerConnection as any).addEventListener('iceconnectionstatechange', () => {
+    (this.peerConnection as any).addEventListener('iceconnectionstatechange', async () => {
       const state = this.peerConnection?.iceConnectionState;
       console.log('ICE connection state:', state);
       this.onIceConnectionStateChange?.(state || 'unknown');
@@ -223,9 +229,11 @@ export class WebRTCService {
       if (state === 'connected' || state === 'completed') {
         console.log('✅ Call connected successfully');
       } else if (state === 'failed') {
-        console.error('❌ ICE connection failed - may need TURN server');
+        console.error('❌ ICE connection failed - attempting to restart ICE...');
+        // Attempt ICE restart
+        await this.restartIce();
       } else if (state === 'disconnected') {
-        console.warn('⚠️ ICE connection disconnected');
+        console.warn('⚠️ ICE connection disconnected - waiting for reconnection...');
       }
     });
 
@@ -396,9 +404,15 @@ export class WebRTCService {
       console.log('👂 Guest: Listening for offer...');
       firestoreOnSnapshot(roomRef, (snapshot: any) => {
         const data = snapshot.data();
-        if (data?.offer && !this.peerConnection?.remoteDescription) {
-          console.log('📨 Offer received, creating answer...');
-          this.createAnswer(data.offer);
+        if (data?.offer) {
+          // Check if this is an ICE restart or initial offer
+          if (data.iceRestart && this.peerConnection?.remoteDescription) {
+            console.log('📨 ICE restart offer received, creating new answer...');
+            this.createAnswer(data.offer);
+          } else if (!this.peerConnection?.remoteDescription) {
+            console.log('📨 Initial offer received, creating answer...');
+            this.createAnswer(data.offer);
+          }
         }
       }, (error: any) => {
         console.error('❌ Error listening for offer:', error);
@@ -441,6 +455,50 @@ export class WebRTCService {
     }, (error: any) => {
       console.error('❌ Error listening for ICE candidates:', error);
     });
+  }
+
+  /**
+   * Restart ICE connection when it fails
+   */
+  private async restartIce(): Promise<void> {
+    if (!this.peerConnection) {
+      console.error('❌ No peer connection available for ICE restart');
+      return;
+    }
+
+    try {
+      console.log('🔄 Attempting ICE restart...');
+      
+      if (this.isHost) {
+        // Host creates a new offer with iceRestart flag
+        const offerDescription = await this.peerConnection.createOffer({ 
+          iceRestart: true,
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true,
+        });
+        
+        await this.peerConnection.setLocalDescription(offerDescription);
+        
+        // Save new offer to Firestore
+        if (firebaseFirestore && firestoreDoc && firestoreUpdateDoc) {
+          const roomRef = firestoreDoc(firebaseFirestore, 'rooms', this.roomName);
+          await firestoreUpdateDoc(roomRef, {
+            offer: {
+              type: offerDescription.type,
+              sdp: offerDescription.sdp,
+            },
+            iceRestart: true,
+            restartedAt: new Date().toISOString(),
+          });
+          console.log('✅ ICE restart offer sent');
+        }
+      } else {
+        // Guest will receive the new offer and create a new answer
+        console.log('⏳ Guest waiting for ICE restart offer from host...');
+      }
+    } catch (error) {
+      console.error('❌ Error during ICE restart:', error);
+    }
   }
 
   async toggleMute(): Promise<boolean> {

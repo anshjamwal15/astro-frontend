@@ -187,8 +187,7 @@ export class WalletApiService {
 
       const jwtToken = await this.getJwtToken();
       
-      // Use negative amount to deduct (e.g., -34 to deduct ₹34)
-      const deductAmount = -Math.abs(amount);
+      const deductAmount = Math.abs(amount);
       
       const requestBody = {
         userId: userId,
