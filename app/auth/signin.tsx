@@ -216,6 +216,8 @@ export default function SignInScreen() {
           </TouchableOpacity>
 
           {/* Sign In as Mentor Button */}
+          
+          {/*
           <TouchableOpacity 
             style={styles.mentorSignInButton}
             onPress={handleMentorSignIn}
@@ -228,6 +230,7 @@ export default function SignInScreen() {
               <Text style={styles.mentorSignInButtonText}>SIGN IN AS MENTOR</Text>
             </View>
           </TouchableOpacity>
+          */}
 
           {/* <View style={styles.divider}>
             <View style={styles.dividerLine} />
