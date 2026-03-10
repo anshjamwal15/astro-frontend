@@ -18,12 +18,14 @@ import { useUser, getFirstName } from '../../contexts/UserContext';
 import { ApiService } from '../../services/apiService';
 import { WalletService } from '../../services/WalletService';
 import { generateVideoRoomName, generateSessionId } from '../../utils/roomNameGenerator';
+import PermissionRequest from '../../components/PermissionRequest';
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [astrologers, setAstrologers] = useState<any[]>([]);
   const [filteredServices, setFilteredServices] = useState<any[]>([]);
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
   const { user } = useUser();
 
   // Get user's first name for greeting
@@ -177,6 +179,9 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0052CC" />
+      
+      {/* Permission Request Modal */}
+      <PermissionRequest onComplete={() => setPermissionsGranted(true)} />
       
       {/* Blue Header */}
       <LinearGradient

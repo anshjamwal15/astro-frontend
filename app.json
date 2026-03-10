@@ -34,6 +34,13 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow ADVIJR to access your photos to set profile picture",
+          "cameraPermission": "Allow ADVIJR to access your camera to take profile picture"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",

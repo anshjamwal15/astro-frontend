@@ -110,6 +110,7 @@ export default function ProfileTab() {
     if (!hasPermission) return;
 
     try {
+      console.log('📸 Launching image library...');
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -117,12 +118,17 @@ export default function ProfileTab() {
         quality: 0.8,
       });
 
+      console.log('📸 Image picker result:', result);
+
       if (!result.canceled && result.assets[0]) {
+        console.log('📸 Image selected:', result.assets[0].uri);
         await saveProfileImage(result.assets[0].uri);
+      } else {
+        console.log('📸 Image selection cancelled');
       }
     } catch (error) {
-      console.error('Error picking image from gallery:', error);
-      Alert.alert('Error', 'Failed to pick image from gallery');
+      console.error('❌ Error picking image from gallery:', error);
+      Alert.alert('Error', `Failed to pick image: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -131,18 +137,24 @@ export default function ProfileTab() {
     if (!hasPermission) return;
 
     try {
+      console.log('📷 Launching camera...');
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
 
+      console.log('📷 Camera result:', result);
+
       if (!result.canceled && result.assets[0]) {
+        console.log('📷 Photo taken:', result.assets[0].uri);
         await saveProfileImage(result.assets[0].uri);
+      } else {
+        console.log('📷 Photo capture cancelled');
       }
     } catch (error) {
-      console.error('Error taking photo with camera:', error);
-      Alert.alert('Error', 'Failed to take photo');
+      console.error('❌ Error taking photo with camera:', error);
+      Alert.alert('Error', `Failed to take photo: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
