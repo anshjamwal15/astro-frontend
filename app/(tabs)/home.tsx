@@ -24,6 +24,7 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [astrologers, setAstrologers] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
   const [filteredServices, setFilteredServices] = useState<any[]>([]);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
   const { user } = useUser();
@@ -33,6 +34,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadAstrologers();
+    loadCategories();
   }, []);
 
   const loadAstrologers = async () => {
@@ -55,16 +57,42 @@ export default function HomeScreen() {
     }
   };
 
-  const services = [
-    { id: 1, title: 'Buisness\nHelp', icon: 'sunny', keywords: ['horoscope', 'daily', 'astrology', 'prediction'] },
-    { id: 2, title: 'Marrige\nHelp', icon: 'analytics', keywords: ['kundli', 'birth chart', 'free', 'astrology'] },
-    { id: 3, title: 'Study\nConsultaion', icon: 'heart', keywords: ['matching', 'compatibility', 'marriage', 'kundli'] },
-    { id: 4, title: 'Women\nHealth', icon: 'chatbubbles', keywords: ['chat', 'free', 'talk', 'astrologer'] },
-  ];
-
-  useEffect(() => {
-    setFilteredServices(services);
-  }, []);
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('http://3.108.112.130:3000/api/category/list', {
+        headers: { accept: 'application/hal+json' },
+      });
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        // Map API categories to service card shape
+        const categoryIconMap: Record<string, string> = {
+          'marriage': 'heart',
+          'career': 'briefcase',
+          'business': 'trending-up',
+          'buisness': 'trending-up',
+          'study': 'book',
+          'health': 'fitness',
+          'women': 'female',
+        };
+        const mapped = data.map((cat: any) => {
+          const key = Object.keys(categoryIconMap).find(k =>
+            cat.name.toLowerCase().includes(k)
+          );
+          return {
+            id: cat.id,
+            title: cat.name,
+            description: cat.description,
+            icon: key ? categoryIconMap[key] : 'grid',
+            keywords: [cat.name.toLowerCase(), cat.description?.toLowerCase() ?? ''],
+          };
+        });
+        setServices(mapped);
+        setFilteredServices(mapped);
+      }
+    } catch (error) {
+      console.error('❌ Error loading categories:', error);
+    }
+  };
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -72,13 +100,13 @@ export default function HomeScreen() {
     } else {
       const filtered = services.filter(service => 
         service.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        service.keywords.some(keyword => 
+        service.keywords.some((keyword: string) => 
           keyword.toLowerCase().includes(searchQuery.toLowerCase())
         )
       );
       setFilteredServices(filtered);
     }
-  }, [searchQuery]);
+  }, [searchQuery, services]);
 
   const handleServicePress = (service: any) => {
     // if (service.title.includes('Buisness\nHelp')) {
