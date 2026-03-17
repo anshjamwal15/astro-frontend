@@ -160,6 +160,13 @@ export default function HomeScreen() {
   };
 
   const handleConsultation = async (astrologer?: any) => {
+
+    // TODO: Change it
+    if (true) {
+      Alert.alert('Error', 'Chat feature is not working for now');
+      return;
+    }
+
     if (!user?.id) {
       Alert.alert('Error', 'Please login to start a chat.');
       return;
@@ -281,7 +288,7 @@ export default function HomeScreen() {
           
         </View>
         {/* Top Astrologers */}
-        <View style={styles.section}>
+        <View style={[styles.section, styles.mentorsSection]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Top Mentors</Text>
             {/* <TouchableOpacity>
@@ -302,51 +309,70 @@ export default function HomeScreen() {
                   key={`astrologer-${astrologer.id}-${index}`}
                   style={styles.astrologerCard}
                   onPress={() => handleConsultation(astrologer)}
+                  activeOpacity={0.92}
                 >
-                  <View style={styles.astrologerImageContainer}>
-                    {astrologer.image ? (
-                      <Image 
-                        source={astrologer.image} 
-                        style={styles.astrologerImage}
-                        onError={() => {
-                          // Fallback handled by conditional rendering
-                        }}
-                      />
-                    ) : (
-                      <View style={styles.astrologerImagePlaceholder}>
-                        <Ionicons name="person" size={32} color="#0052CC" />
+                  {/* Card top gradient strip */}
+                  <LinearGradient
+                    colors={['#0052CC', '#0066FF']}
+                    style={styles.astrologerCardHeader}
+                  >
+                    <View style={styles.astrologerImageContainer}>
+                      {astrologer.image ? (
+                        <Image
+                          source={astrologer.image}
+                          style={styles.astrologerImage}
+                        />
+                      ) : (
+                        <View style={styles.astrologerImagePlaceholder}>
+                          <Ionicons name="person" size={30} color="#0052CC" />
+                        </View>
+                      )}
+                      {astrologer.isOnline && <View style={styles.onlineIndicator} />}
+                    </View>
+                  </LinearGradient>
+
+                  {/* Card body */}
+                  <View style={styles.astrologerCardBody}>
+                    <Text style={styles.astrologerName} numberOfLines={1}>{astrologer.name}</Text>
+
+                    <View style={styles.ratingContainer}>
+                      <Ionicons name="star" size={11} color="#FFB800" />
+                      <Text style={styles.ratingText}>{astrologer.rating ?? '4.5'}</Text>
+                    </View>
+
+                    {/* Price rows */}
+                    <View style={styles.priceDivider} />
+                    <View style={styles.priceRow}>
+                      <View style={styles.priceItem}>
+                        <Ionicons name="chatbubble-ellipses" size={11} color="#0052CC" />
+                        <Text style={styles.priceLabel}>Chat</Text>
+                        <Text style={styles.priceText}>₹{astrologer.rate || astrologer.price || 17}/m</Text>
                       </View>
-                    )}
-                    {astrologer.isOnline && <View style={styles.onlineIndicator} />}
-                  </View>
-                  <Text style={styles.astrologerName} numberOfLines={1}>{astrologer.name}</Text>
-                  <View style={styles.ratingContainer}>
-                    <Ionicons name="star" size={12} color="#FFB800" />
-                    <Text style={styles.ratingText}>{astrologer.rating}</Text>
-                  </View>
-                  <View style={styles.priceSection}>
-                    <Text style={styles.priceLabel}>Chat</Text>
-                    <Text style={styles.priceText}>₹{astrologer.rate || astrologer.price || 17}/min</Text>
-                  </View>
-                  <View style={styles.priceSection}>
-                    <Text style={styles.priceLabel}>Video</Text>
-                    <Text style={styles.priceText}>₹{(astrologer.rate || astrologer.price || 17) * 2}/min</Text>
-                  </View>
-                  <View style={styles.buttonRow}>
-                    <TouchableOpacity 
-                      style={styles.consultButton}
-                      onPress={() => handleConsultation(astrologer)}
-                    >
-                      <Ionicons name="chatbubble-ellipses" size={14} color="#FFFFFF" />
-                      <Text style={styles.consultButtonText}>Chat</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.videoCallButton}
-                      onPress={() => handleVideoCall(astrologer)}
-                    >
-                      <Ionicons name="videocam" size={14} color="#FFFFFF" />
-                    </TouchableOpacity>
+                      <View style={styles.priceSeparator} />
+                      <View style={styles.priceItem}>
+                        <Ionicons name="videocam" size={11} color="#FF6B6B" />
+                        <Text style={styles.priceLabel}>Video</Text>
+                        <Text style={styles.priceText}>₹{(astrologer.rate || astrologer.price || 17) * 2}/m</Text>
+                      </View>
+                    </View>
+                    <View style={styles.priceDivider} />
+
+                    {/* Buttons */}
+                    <View style={styles.buttonRow}>
+                      <TouchableOpacity
+                        style={styles.consultButton}
+                        onPress={() => handleConsultation(astrologer)}
+                      >
+                        <Ionicons name="chatbubble-ellipses" size={13} color="#FFFFFF" />
+                        <Text style={styles.consultButtonText}>Chat</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.videoCallButton}
+                        onPress={() => handleVideoCall(astrologer)}
+                      >
+                        <Ionicons name="videocam" size={13} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -539,44 +565,60 @@ const styles = StyleSheet.create({
   loader: {
     marginVertical: 20,
   },
+  mentorsSection: {
+    paddingBottom: 28,
+    paddingTop: 20,
+  },
   astrologerScrollContent: {
     paddingRight: 20,
+    paddingBottom: 16,
+    paddingTop: 8,
   },
   astrologerCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 12,
-    marginRight: 12,
-    width: 140,
+    borderRadius: 18,
+    marginRight: 14,
+    width: 148,
+    overflow: 'hidden',
+    shadowColor: '#0052CC',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 2,
+    elevation: 10,
+  },
+  astrologerCardHeader: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
+  astrologerCardBody: {
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingBottom: 12,
+    marginTop: -14,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   astrologerImageContainer: {
     position: 'relative',
-    marginBottom: 8,
   },
   astrologerImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: '#0052CC',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
   },
   astrologerImagePlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#E8F0FE',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#0052CC',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
   },
   onlineIndicator: {
     position: 'absolute',
@@ -591,35 +633,57 @@ const styles = StyleSheet.create({
   },
   astrologerName: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    fontWeight: '700',
+    color: '#1A1A2E',
+    marginTop: 8,
+    marginBottom: 3,
     textAlign: 'center',
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    backgroundColor: '#FFF8E7',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 20,
     gap: 3,
+    marginBottom: 8,
   },
   ratingText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
+    fontSize: 11,
+    color: '#B8860B',
+    fontWeight: '600',
   },
-  priceSection: {
+  priceDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#F0F4FF',
+    marginVertical: 6,
+  },
+  priceRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    width: '100%',
+    justifyContent: 'space-around',
+  },
+  priceItem: {
+    alignItems: 'center',
+    gap: 2,
+    flex: 1,
+  },
+  priceSeparator: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E8EEFF',
   },
   priceLabel: {
     fontSize: 10,
-    color: '#999',
+    color: '#888',
     fontWeight: '500',
-    marginBottom: 2,
   },
   priceText: {
-    fontSize: 12,
-    color: '#FF8C42',
+    fontSize: 11,
+    color: '#0052CC',
     fontWeight: '700',
   },
   buttonRow: {
@@ -627,13 +691,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     width: '100%',
+    marginTop: 4,
   },
   consultButton: {
     flex: 1,
     backgroundColor: '#0052CC',
     paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 12,
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -641,14 +705,14 @@ const styles = StyleSheet.create({
   },
   consultButtonText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   videoCallButton: {
     backgroundColor: '#FF6B6B',
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
