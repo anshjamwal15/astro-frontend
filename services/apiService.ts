@@ -43,20 +43,36 @@ export interface UserData {
 }
 
 export interface MentorData {
-  id?: number;
+  id: string;
   name: string;
-  email?: string;
-  mobile?: string;
-  specialization?: string;
-  experience?: number;
+  email: string;
+  mobile: string;
+  country?: string;
+  status?: string;
+  about?: string;
+  expertise?: string[];
   rating?: number;
+  ratingCount?: number;
+  createdAt?: string;
+  jwtToken?: string;
+  userId?: string;
+  deviceToken?: string;
+  // UI-only fields
+  specialization?: string;
+  experience?: string;
   isAvailable?: boolean;
   photo?: string;
   languages?: string;
   price?: number;
   rate?: number;
   originalPrice?: number;
-  ratingCount?: number;
+}
+
+interface PaginatedResponse<T> {
+  items: T[];
+  page: number;
+  size: number;
+  total: number;
 }
 
 export interface MessageData {
@@ -271,11 +287,26 @@ export class ApiService {
   }
 
   /**
-   * GET /api/mentor/list - Get all mentors
+   * GET /api/mentor/list - Get paginated mentors
    */
-  static async getMentors(): Promise<ApiResponse<MentorData[]>> {
+  static async getMentors(params?: {
+    page?: number;
+    size?: number;
+    totalExp?: number;
+    totalRatings?: number;
+    nationality?: string;
+    category?: string;
+  }): Promise<ApiResponse<MentorData[]> & { pagination?: { page: number; size: number; total: number } }> {
     try {
-      const url = `${this.baseUrl}/api/mentor/list`;
+      const query = new URLSearchParams();
+      if (params?.page) query.set('page', String(params.page));
+      if (params?.size) query.set('size', String(params.size));
+      if (params?.totalExp != null) query.set('totalExp', String(params.totalExp));
+      if (params?.totalRatings != null) query.set('totalRatings', String(params.totalRatings));
+      if (params?.nationality) query.set('nationality', params.nationality);
+      if (params?.category) query.set('category', params.category);
+
+      const url = `${this.baseUrl}/api/mentor/list${query.toString() ? '?' + query.toString() : ''}`;
       console.log('Fetching mentors from:', url);
       
       const response = await fetch(url);
@@ -291,11 +322,12 @@ export class ApiService {
       
       // Parse JSON
       try {
-        const data = JSON.parse(responseText);
-        console.log(`✅ Successfully fetched ${data.length} mentors`);
+        const paginated: PaginatedResponse<MentorData> = JSON.parse(responseText);
+        console.log(`✅ Successfully fetched ${paginated.items.length} mentors (total: ${paginated.total})`);
         return {
           success: true,
-          data,
+          data: paginated.items,
+          pagination: { page: paginated.page, size: paginated.size, total: paginated.total },
           message: 'Mentors fetched successfully',
         };
       } catch (parseError) {

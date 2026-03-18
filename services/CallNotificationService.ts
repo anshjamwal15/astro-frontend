@@ -25,11 +25,11 @@ export interface MentorData {
   about: string | null;
   expertise: string[];
   rating: number;
-  rating_count: number;
-  created_at: string;
-  jwt_token: string | null;
-  user_id: string;
-  device_token: string | null;
+  ratingCount: number;
+  createdAt: string;
+  jwtToken: string | null;
+  userId: string;
+  deviceToken: string | null;
 }
 
 export class CallNotificationService {
@@ -179,8 +179,9 @@ export class CallNotificationService {
         return this.mentorListCache;
       }
 
-      const mentors: MentorData[] = await response.json();
-      console.log(`✅ Fetched ${mentors.length} mentors from backend`);
+      const paginated: { items: MentorData[]; page: number; size: number; total: number } = await response.json();
+      const mentors = paginated.items;
+      console.log(`✅ Fetched ${mentors.length} mentors from backend (total: ${paginated.total})`);
       
       // Update cache
       this.mentorListCache = mentors;
@@ -220,23 +221,23 @@ export class CallNotificationService {
         return null;
       }
 
-      // Find mentor by ID (check both id and user_id fields)
-      const mentor = mentors.find(m => m.id === mentorId || m.user_id === mentorId);
+      // Find mentor by ID (check both id and userId fields)
+      const mentor = mentors.find(m => m.id === mentorId || m.userId === mentorId);
       
       if (!mentor) {
         console.warn(`⚠️ Mentor not found with ID: ${mentorId}`);
-        console.log('Available mentor IDs:', mentors.map(m => ({ id: m.id, user_id: m.user_id })));
+        console.log('Available mentor IDs:', mentors.map(m => ({ id: m.id, userId: m.userId })));
         return null;
       }
 
-      if (!mentor.device_token) {
+      if (!mentor.deviceToken) {
         console.warn(`⚠️ Mentor ${mentor.name} (${mentorId}) has no device token registered`);
         return null;
       }
 
       console.log(`✅ Found device token for mentor ${mentor.name} (${mentorId})`);
-      console.log(`📱 Device token: ${mentor.device_token.substring(0, 50)}...`);
-      return mentor.device_token;
+      console.log(`📱 Device token: ${mentor.deviceToken.substring(0, 50)}...`);
+      return mentor.deviceToken;
     } catch (error: any) {
       console.error('❌ Error getting device token:', error);
       return null;
