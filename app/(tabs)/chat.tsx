@@ -10,11 +10,11 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser, getFirstName } from '../../contexts/UserContext';
 import { ApiService } from '../../services/apiService';
+import AppHeader from '../../components/AppHeader';
 
 interface ChatRoom {
   id: string;
@@ -32,6 +32,7 @@ export default function ChatScreen() {
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const { user } = useUser();
   const firstName = user ? getFirstName(user.name) : 'User';
 
@@ -153,19 +154,11 @@ export default function ChatScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#0052CC" />
       
       {/* Header */}
-      <LinearGradient
-        colors={['#0052CC', '#0066FF']}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Chats</Text>
-          {getTotalUnreadCount() > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{getTotalUnreadCount()}</Text>
-            </View>
-          )}
-        </View>
-      </LinearGradient>
+      <AppHeader
+        firstName={firstName}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
       {/* Chat List */}
       {loading ? (
@@ -259,34 +252,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F8F8',
-  },
-  header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginRight: 10,
-  },
-  unreadBadge: {
-    backgroundColor: '#FF4444',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    minWidth: 24,
-    alignItems: 'center',
-  },
-  unreadBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,

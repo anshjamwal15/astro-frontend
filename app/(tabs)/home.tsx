@@ -7,7 +7,6 @@ import {
   StyleSheet,
   StatusBar,
   Image,
-  TextInput,
   Alert,
   ActivityIndicator,
 } from 'react-native';
@@ -19,6 +18,7 @@ import { ApiService } from '../../services/apiService';
 import { WalletService } from '../../services/WalletService';
 import { generateVideoRoomName, generateSessionId } from '../../utils/roomNameGenerator';
 import PermissionRequest from '../../components/PermissionRequest';
+import AppHeader from '../../components/AppHeader';
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -219,53 +219,14 @@ export default function HomeScreen() {
       <PermissionRequest onComplete={() => setPermissionsGranted(true)} />
       
       {/* Blue Header */}
-      <LinearGradient
-        colors={['#0052CC', '#0066FF']}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.greetingSection}>
-            <Text style={styles.greeting}>Hello, {firstName}!</Text>
-            <Text style={styles.subGreeting}>Welcome to ADVIJR</Text>
-          </View>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity 
-              style={styles.walletButton}
-              onPress={() => router.push('/(tabs)/wallet')}
-            >
-              <Ionicons name="wallet" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.profileButton}
-              onPress={() => router.push('/(tabs)/profile')}
-            >
-              <Ionicons name="person" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search astrologers, services..."
-            placeholderTextColor="#999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          <TouchableOpacity 
-            style={styles.searchButton}
-            onPress={() => {
-              if (searchQuery.trim()) {
-                // Search functionality is handled by useEffect
-                console.log('Searching for:', searchQuery);
-              }
-            }}
-          >
-            <Ionicons name="search" size={18} color="#666" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+      <AppHeader
+        firstName={firstName}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchSubmit={() => {
+          if (searchQuery.trim()) console.log('Searching for:', searchQuery);
+        }}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Services Section */}
@@ -308,7 +269,6 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={`astrologer-${astrologer.id}-${index}`}
                   style={styles.astrologerCard}
-                  onPress={() => handleConsultation(astrologer)}
                   activeOpacity={0.92}
                 >
                   {/* Card top gradient strip */}
@@ -384,7 +344,7 @@ export default function HomeScreen() {
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => router.push('/(tabs)/call')}
+            // onPress={() => router.push('/(tabs)/call')}
           >
             <Ionicons name="call" size={24} color="#333" />
             <Text style={styles.actionButtonText}>Call an Mentor</Text>

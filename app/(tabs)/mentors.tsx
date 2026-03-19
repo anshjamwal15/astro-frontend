@@ -19,9 +19,9 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser, getFirstName } from '../../contexts/UserContext';
 import { WalletService } from '../../services/WalletService';
-import WalletBalance from '../../components/WalletBalance';
 import { ApiService } from '../../services/apiService';
 import { generateVideoRoomName, generateSessionId } from '../../utils/roomNameGenerator';
+import AppHeader from '../../components/AppHeader';
 
 interface Mentor {
   id: string;
@@ -74,6 +74,7 @@ export default function MentorsScreen() {
     nationality: '',
   });
 
+  const [searchQuery, setSearchQuery] = useState('');
   const { user } = useUser();
   const firstName = user ? getFirstName(user.name) : 'User';
 
@@ -258,18 +259,11 @@ export default function MentorsScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#0052CC" />
 
-      <LinearGradient colors={['#0052CC', '#0066FF']} style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.userInfo}>
-            <Image
-              source={{ uri: user?.profilePicture || `https://via.placeholder.com/40x40/4A90E2/FFFFFF?text=${firstName.charAt(0)}` }}
-              style={styles.userAvatar}
-            />
-            <Text style={styles.greeting}>Hi {firstName}</Text>
-          </View>
-          <WalletBalance showAddMoney={true} />
-        </View>
-      </LinearGradient>
+      <AppHeader
+        firstName={firstName}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
       {/* Filter bar */}
       <View style={styles.filterContainer}>
@@ -475,11 +469,6 @@ export default function MentorsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
-  header: { paddingTop: 50, paddingBottom: 15, paddingHorizontal: 20 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  userInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  userAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
-  greeting: { fontSize: 18, fontWeight: '600', color: '#333' },
   loadingContainer: { flex: 1, alignItems: 'center', paddingVertical: 50 },
   loadingText: { fontSize: 16, color: '#666', marginTop: 10 },
   filterContainer: {

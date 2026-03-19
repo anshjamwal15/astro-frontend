@@ -63,49 +63,14 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="call"
-        options={{
-          title: 'Call',
-          tabBarIcon: ({ focused }) => (
-            <Ionicons 
-              name={focused ? "call" : "call-outline"} 
-              size={24} 
-              color={focused ? '#333333' : '#999999'} 
-            />
-          ),
-        }}
-      />
-      
-      {/* Hidden screens - accessible via navigation but not in tab bar */}
-      <Tabs.Screen
-        name="horoscope"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="index"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="notifications"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="categories"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="wallet"
-        options={{ href: null }}
-      />
+      <Tabs.Screen name="call" options={{ href: null }} />
+      <Tabs.Screen name="horoscope" options={{ href: null }} />
+      <Tabs.Screen name="index" options={{ href: null }} />
+      <Tabs.Screen name="profile" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="categories" options={{ href: null }} />
+      <Tabs.Screen name="wallet" options={{ href: null }} />
     </Tabs>
   );
 }
