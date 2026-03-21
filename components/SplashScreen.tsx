@@ -10,7 +10,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useUser } from '../contexts/UserContext';
 import { AuthService } from '../services/authService';
-import { DeviceTokenService } from '../services/deviceTokenService';
 import PushNotificationService from '../services/PushNotificationService';
 
 export default function SplashScreen() {
@@ -59,8 +58,11 @@ export default function SplashScreen() {
         console.log('🔑 Token preview:', jwtToken.substring(0, 50) + '...');
         
         try {
-          // Validate token with backend
-          const userData = await AuthService.tokenSignIn(jwtToken);
+          // Get device token to send along with token-signin
+          const deviceToken = PushNotificationService.getToken() || undefined;
+
+          // Validate token with backend (also updates device token if available)
+          const userData = await AuthService.tokenSignIn(jwtToken, deviceToken);
           console.log('✅ Token valid, user authenticated:', userData);
           
           // Update user data and token
@@ -76,19 +78,6 @@ export default function SplashScreen() {
           
           // Update with refreshed token
           await setJwtToken(userData.jwtToken);
-          
-          // Register device token with backend for push notifications
-          try {
-            const deviceTokenResult = await DeviceTokenService.registerDeviceToken(userData.id);
-            if (deviceTokenResult.success) {
-              console.log('✅ Device token registered with backend during auto-login');
-            } else {
-              console.warn('⚠️ Failed to register device token:', deviceTokenResult.error);
-            }
-          } catch (deviceTokenError) {
-            console.error('❌ Error registering device token:', deviceTokenError);
-            // Don't block auto-login if device token registration fails
-          }
           
           // Mark app as ready for notification navigation
           PushNotificationService.setAppReady();

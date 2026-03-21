@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser, getFirstName } from '../../contexts/UserContext';
 import { ApiService } from '../../services/apiService';
+import { chatService, ChatRoomResponse } from '../../services/ChatService';
 import AppHeader from '../../components/AppHeader';
 
 interface ChatRoom {
@@ -35,12 +36,33 @@ export default function ChatScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const { user } = useUser();
   const firstName = user ? getFirstName(user.name) : 'User';
+  const unsubscribeRooms = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (user?.id) {
       loadChatRooms();
+      connectAndSubscribe();
     }
+    return () => {
+      unsubscribeRooms.current?.();
+      unsubscribeRooms.current = null;
+    };
   }, [user?.id]);
+
+  const connectAndSubscribe = async () => {
+    try {
+      await chatService.connect();
+      // Subscribe to global room updates (join/leave/create broadcasts)
+      unsubscribeRooms.current = chatService.subscribeToRoomUpdates((updatedRoom: ChatRoomResponse) => {
+        // Refresh the room list when any room changes that involves this user
+        if (user?.id && updatedRoom.participant_ids.includes(user.id)) {
+          loadChatRooms();
+        }
+      });
+    } catch (e) {
+      console.warn('WebSocket unavailable for room updates:', e);
+    }
+  };
 
   const loadChatRooms = async () => {
     try {

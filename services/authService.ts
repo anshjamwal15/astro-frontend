@@ -319,13 +319,17 @@ export class AuthService {
   }
 
   // Token-based Sign In (Auto Login)
-  static async tokenSignIn(jwtToken: string): Promise<any> {
+  static async tokenSignIn(jwtToken: string, deviceToken?: string): Promise<any> {
     try {
       console.log('=== TOKEN SIGNIN ATTEMPT START ===');
       
-      const requestBody = {
+      const requestBody: Record<string, string> = {
         jwt_token: jwtToken,
       };
+
+      if (deviceToken && deviceToken.trim() !== '') {
+        requestBody.device_token = deviceToken;
+      }
 
       const tokenSigninUrl = `${AUTH_CONFIG.API.BASE_URL}${AUTH_CONFIG.API.ENDPOINTS.TOKEN_SIGNIN}`;
       console.log('Token signin URL:', tokenSigninUrl);

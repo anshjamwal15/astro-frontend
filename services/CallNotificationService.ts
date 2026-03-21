@@ -26,17 +26,22 @@ export interface MentorData {
   expertise: string[];
   rating: number;
   ratingCount: number;
+  rating_count?: number;
   createdAt: string;
+  created_at?: string;
   jwtToken: string | null;
+  jwt_token?: string | null;
   userId: string;
+  user_id?: string | null;
   deviceToken: string | null;
+  device_token?: string | null;
 }
 
 export class CallNotificationService {
   private static baseUrl = AUTH_CONFIG.API.BASE_URL;
   private static mentorListCache: MentorData[] = [];
   private static mentorListCacheTime: number = 0;
-  private static CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+  private static CACHE_DURATION = 5 * 60 * 1000;
 
   /**
    * Send call notification to backend
@@ -47,7 +52,7 @@ export class CallNotificationService {
     try {
       console.log('📞 Sending call notification:', payload);
 
-      const response = await fetch(`${this.baseUrl}/api/notifications/call`, {
+      const response = await fetch(`${this.baseUrl}/api/notifications/${payload.type === "CHAT" ? 'message' : 'call'}`, {
         method: 'POST',
         headers: {
           'Accept': 'application/hal+json',
@@ -230,14 +235,14 @@ export class CallNotificationService {
         return null;
       }
 
-      if (!mentor.deviceToken) {
+      if (!mentor.deviceToken && !(mentor as any).device_token) {
         console.warn(`⚠️ Mentor ${mentor.name} (${mentorId}) has no device token registered`);
         return null;
       }
 
+      const token = mentor.deviceToken || (mentor as any).device_token;
       console.log(`✅ Found device token for mentor ${mentor.name} (${mentorId})`);
-      console.log(`📱 Device token: ${mentor.deviceToken.substring(0, 50)}...`);
-      return mentor.deviceToken;
+      return token;
     } catch (error: any) {
       console.error('❌ Error getting device token:', error);
       return null;

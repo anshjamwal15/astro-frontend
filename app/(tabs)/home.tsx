@@ -14,9 +14,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser, getFirstName } from '../../contexts/UserContext';
-import { ApiService } from '../../services/apiService';
 import { WalletService } from '../../services/WalletService';
-import { generateVideoRoomName, generateSessionId } from '../../utils/roomNameGenerator';
+import { generateVideoRoomName, generateSessionId, getOrCreateChatRoomKey } from '../../utils/roomNameGenerator';
+import { CallNotificationService } from '../../services/CallNotificationService';
+import { ApiService } from '../../services/apiService';
+import { chatService } from '../../services/ChatService';
 import PermissionRequest from '../../components/PermissionRequest';
 import AppHeader from '../../components/AppHeader';
 
@@ -160,54 +162,65 @@ export default function HomeScreen() {
   };
 
   const handleConsultation = async (astrologer?: any) => {
-
-    // TODO: Change it
-    if (true) {
-      Alert.alert('Error', 'Chat feature is not working for now');
-      return;
-    }
-
     if (!user?.id) {
       Alert.alert('Error', 'Please login to start a chat.');
       return;
     }
 
-    // If astrologer data is provided, start a chat session
-    if (astrologer) {
-      try {
-        const chatRate = astrologer.rate || astrologer.price || 17;
-        const sessionId = generateSessionId('chat'); // Short unique ID
-        
-        // Start the session
-        const sessionStatus = await WalletService.startSession(
-          sessionId,
-          user.id,
-          astrologer.id,
-          'CHAT'
-        );
-
-        if (sessionStatus.status === 'STARTED') {
-          router.push({
-            pathname: '/chatbox',
-            params: {
-              astrologerId: astrologer.id.toString(),
-              astrologerName: astrologer.name,
-              astrologerImage: astrologer.image || `https://via.placeholder.com/60x60/4A90E2/FFFFFF?text=${astrologer.name.charAt(0)}`,
-              isOnline: astrologer.isOnline ?? false,
-              sessionId: sessionId,
-              ratePerMinute: chatRate.toString(),
-            }
-          });
-        } else {
-          Alert.alert('Error', sessionStatus.message || 'Failed to start chat session');
-        }
-      } catch (error: any) {
-        console.error('Error starting chat:', error);
-        Alert.alert('Error', 'Unable to start chat. Please try again.');
-      }
-    } else {
-      // Navigate to chat list
+    if (!astrologer) {
       router.push('/(tabs)/chat');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const chatRate = astrologer.rate || astrologer.price || 17;
+      const sessionId = generateSessionId('chat');
+
+      // Find or create the short persistent chat room for this user-mentor pair
+      const roomName = await getOrCreateChatRoomKey(user.id, astrologer.id);
+      const userRoomsResponse = await ApiService.getUserChatRooms(user.id);
+      let roomId: string;
+
+      const existingRoom = userRoomsResponse.success && userRoomsResponse.data
+        ? userRoomsResponse.data.find((r: any) => r.name === roomName)
+        : null;
+
+      if (existingRoom) {
+        roomId = existingRoom.id;
+      } else {
+        const createRes = await ApiService.createChatRoom(roomName);
+        if (!createRes.success) throw new Error('Failed to create chat room');
+        roomId = createRes.data.id;
+        await ApiService.joinChatRoom(roomId, user.id);
+      }
+
+      // Send push notification to mentor so they can join the room
+      chatService.sendMessageNotification({
+        recipientMentorId: astrologer.id,
+        senderName: user.name || 'User',
+        senderId: user.id,
+        chatRoomId: roomId,
+        message: `${user.name || 'A user'} wants to chat with you`,
+      }).catch(() => {});
+
+      // Navigate to chatbox
+      router.push({
+        pathname: '/chatbox',
+        params: {
+          astrologerId: astrologer.id.toString(),
+          astrologerName: astrologer.name,
+          astrologerImage: astrologer.image || `https://via.placeholder.com/60x60/4A90E2/FFFFFF?text=${astrologer.name.charAt(0)}`,
+          isOnline: String(astrologer.isOnline ?? false),
+          sessionId,
+          ratePerMinute: chatRate.toString(),
+        },
+      });
+    } catch (error: any) {
+      console.error('Error starting chat:', error);
+      Alert.alert('Error', 'Unable to start chat. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 

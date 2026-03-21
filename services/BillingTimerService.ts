@@ -188,7 +188,7 @@ export class BillingTimerService {
 
     // End the billing session on the backend (optional - for tracking purposes)
     try {
-      await WalletService.endSession(sessionId, endReason);
+      // await WalletService.endSession(sessionId, endReason);
       console.log(`✅ Backend session ${sessionId} ended successfully`);
     } catch (error) {
       console.warn('Backend session end failed (non-critical):', error);

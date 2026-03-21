@@ -38,16 +38,21 @@ export function generateVoiceRoomName(): string {
   return `a-${shortId}`.substring(0, 20);
 }
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 /**
- * Generate a short room name for chat
- * Format: "c-{shortId}" (max 20 chars)
- * Example: "c-lx3k9p2abc"
- * 
- * @returns Short unique room name (max 20 characters)
+ * Get or create a short persistent chat room name for a user-mentor pair.
+ * Stored in AsyncStorage so the same pair always reuses the same room.
  */
-export function generateChatRoomName(): string {
-  const shortId = generateShortId();
-  return `c-${shortId}`.substring(0, 20);
+export async function getOrCreateChatRoomKey(userId: string, mentorId: string): Promise<string> {
+  const storageKey = `chatroom_${userId}_${mentorId}`;
+  const existing = await AsyncStorage.getItem(storageKey);
+  if (existing) return existing;
+  // Generate a new short unique name: "c-" + 6 base36 chars
+  const shortId = Math.random().toString(36).substring(2, 8);
+  const roomName = `c-${shortId}`;
+  await AsyncStorage.setItem(storageKey, roomName);
+  return roomName;
 }
 
 /**
