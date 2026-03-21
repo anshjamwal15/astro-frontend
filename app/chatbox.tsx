@@ -181,8 +181,21 @@ export default function ChatBoxScreen() {
       }
 
       setChatRoomId(roomId);
-      // No message history loading — real-time only via STOMP
 
+      // Load message history
+      try {
+        const historyRes = await ApiService.getChatRoomMessagesPaginated(roomId, 0, 50);
+        if (historyRes.success && historyRes.data?.content?.length > 0) {
+          const sorted = [...historyRes.data.content].sort(
+            (a: any, b: any) => new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime()
+          );
+          setMessages(sorted.map((m: any) => toLocalMessage(m, user!.id)));
+        }
+      } catch (histErr) {
+        console.warn('Failed to load message history:', histErr);
+      }
+
+      // Connect STOMP and subscribe to live messages
       try {
         await chatService.connect();
         unsubscribeMessages.current = chatService.subscribeToRoomMessages(roomId, (wsMsg) => {
@@ -193,7 +206,7 @@ export default function ChatBoxScreen() {
           });
         });
       } catch (wsErr) {
-        console.warn('WebSocket connection failed:', wsErr);
+        console.warn('WebSocket connection failed, falling back to REST polling:', wsErr);
       }
     } catch (error) {
       console.error('Error initializing chat room:', error);

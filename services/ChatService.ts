@@ -2,6 +2,9 @@ import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { AUTH_CONFIG } from '../config/auth';
 import { CallNotificationService } from './CallNotificationService';
 
+// React Native (Hermes/JSC) doesn't have TextEncoder/TextDecoder — polyfill required by @stomp/stompjs
+import 'text-encoding-polyfill';
+
 // Derive WS URL from HTTP base URL
 const WS_URL = AUTH_CONFIG.API.BASE_URL.replace(/^http/, 'ws') + '/ws/websocket';
 
@@ -25,42 +28,61 @@ type RoomListCallback = (rooms: ChatRoomResponse[]) => void;
 class ChatService {
   private client: Client | null = null;
   private connected = false;
-  private connectCallbacks: Array<() => void> = [];
+  private connectPromise: Promise<void> | null = null;
   private subscriptions: Map<string, StompSubscription> = new Map();
 
   connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.connected && this.client?.active) {
-        resolve();
-        return;
+    // Already connected — reuse
+    if (this.connected && this.client?.active) {
+      return Promise.resolve();
+    }
+
+    // Connection already in progress — reuse that promise
+    if (this.connectPromise) {
+      return this.connectPromise;
+    }
+
+    this.connectPromise = new Promise((resolve, reject) => {
+      // Deactivate any stale client before creating a new one
+      if (this.client) {
+        try { this.client.deactivate(); } catch {}
+        this.client = null;
       }
 
       this.client = new Client({
         brokerURL: WS_URL,
         reconnectDelay: 5000,
+        // Required for React Native — use the native WebSocket
+        webSocketFactory: () => new WebSocket(WS_URL),
         onConnect: () => {
           console.log('✅ STOMP connected');
           this.connected = true;
-          this.connectCallbacks.forEach(cb => cb());
-          this.connectCallbacks = [];
+          this.connectPromise = null;
           resolve();
         },
         onDisconnect: () => {
           console.log('🔌 STOMP disconnected');
           this.connected = false;
+          this.connectPromise = null;
         },
         onStompError: (frame) => {
           console.error('STOMP error:', frame);
+          this.connected = false;
+          this.connectPromise = null;
           reject(new Error(frame.headers?.message || 'STOMP connection error'));
         },
         onWebSocketError: (event) => {
           console.error('WebSocket error:', event);
+          this.connected = false;
+          this.connectPromise = null;
           reject(new Error('WebSocket connection failed'));
         },
       });
 
       this.client.activate();
     });
+
+    return this.connectPromise;
   }
 
   disconnect() {
@@ -69,7 +91,9 @@ class ChatService {
     });
     this.subscriptions.clear();
     this.client?.deactivate();
+    this.client = null;
     this.connected = false;
+    this.connectPromise = null;
   }
 
   isConnected(): boolean {
@@ -88,7 +112,7 @@ class ChatService {
     });
     this.subscriptions.set(dest, sub);
     return () => {
-      sub.unsubscribe();
+      try { sub.unsubscribe(); } catch {}
       this.subscriptions.delete(dest);
     };
   }
@@ -105,7 +129,7 @@ class ChatService {
     });
     this.subscriptions.set(dest, sub);
     return () => {
-      sub.unsubscribe();
+      try { sub.unsubscribe(); } catch {}
       this.subscriptions.delete(dest);
     };
   }
@@ -122,14 +146,17 @@ class ChatService {
     });
     this.subscriptions.set(dest, sub);
     return () => {
-      sub.unsubscribe();
+      try { sub.unsubscribe(); } catch {}
       this.subscriptions.delete(dest);
     };
   }
 
-  // Send a chat message to a room and notify the recipient via push
-  async sendMessage(chatRoomId: string, senderUserId: string, content: string) {
-    this.client!.publish({
+  // Send a chat message to a room
+  sendMessage(chatRoomId: string, senderUserId: string, content: string) {
+    if (!this.client || !this.connected) {
+      throw new Error('STOMP client not connected');
+    }
+    this.client.publish({
       destination: '/app/chat/send',
       body: JSON.stringify({
         chat_room_id: chatRoomId,
