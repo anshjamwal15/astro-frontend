@@ -160,14 +160,34 @@ export default function HomeScreen() {
   };
 
   const handleConsultation = async (astrologer?: any) => {
-
-    // TODO: Change it
-    if (true) {
-      Alert.alert('Error', 'Chat feature is not working for now');
+    if (!user?.id) {
+      Alert.alert('Error', 'Please login to start a chat.');
       return;
-    } else {
-      // Navigate to chat list
-      router.push('/(tabs)/chat');
+    }
+    if (!astrologer) {
+      Alert.alert('Error', 'No mentor selected.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { ChatService } = await import('../../services/chatService');
+      const roomName = `${user.name} & ${astrologer.name}`;
+      const room = await ChatService.createChatRoom(roomName, user.id, astrologer.id);
+      router.push({
+        pathname: '/chatbox',
+        params: {
+          roomId: room.id,
+          astrologerId: astrologer.id,
+          astrologerName: astrologer.name,
+          astrologerImage: astrologer.image ?? '',
+          isOnline: (astrologer.isOnline ?? false).toString(),
+        },
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error.message ?? 'Failed to create chat room.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -311,7 +331,13 @@ export default function HomeScreen() {
           
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => router.push('/(tabs)/chat')}
+            onPress={() => {
+              if (astrologers.length > 0) {
+                handleConsultation(astrologers[0]);
+              } else {
+                router.push('/(tabs)/mentors');
+              }
+            }}
           >
             <Ionicons name="chatbubbles" size={24} color="#333" />
             <Text style={styles.actionButtonText}>Chat with Expert</Text>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,68 +13,77 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser, getFirstName } from '../../contexts/UserContext';
-import { ApiService } from '../../services/apiService';
 import AppHeader from '../../components/AppHeader';
+import { ChatService, ChatRoom as FirestoreChatRoom } from '../../services/chatService';
 
-interface ChatRoom {
-  id: string;
-  mentorId: string;
-  mentorName: string;
-  mentorPhoto: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-  isOnline: boolean;
-  imageError?: boolean;
-}
 
 export default function ChatScreen() {
-  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [chatRooms, setChatRooms] = useState<FirestoreChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { user } = useUser();
   const firstName = user ? getFirstName(user.name) : 'User';
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (user?.id) {
-      loadChatRooms();
+      subscribeToRooms();
     }
+    return () => {
+      unsubscribeRef.current?.();
+    };
   }, [user?.id]);
 
-  const loadChatRooms = async () => {
-    // TODO: implement
+  const subscribeToRooms = () => {
+    setLoading(true);
+    unsubscribeRef.current = ChatService.subscribeToUserRooms(
+      user!.id,
+      (rooms) => {
+        setChatRooms(rooms);
+        setLoading(false);
+        setRefreshing(false);
+      },
+      (err) => {
+        console.error('subscribeToUserRooms error:', err);
+        setLoading(false);
+        setRefreshing(false);
+      }
+    );
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadChatRooms();
-    setRefreshing(false);
+    unsubscribeRef.current?.();
+    subscribeToRooms();
   };
 
-  const handleChatPress = (chat: ChatRoom) => {
+  const handleChatPress = (room: FirestoreChatRoom) => {
+    // Derive the other member's id (mentor) — the one that isn't the current user
+    const mentorId = room.members.find((m) => m !== user?.id) ?? '';
     router.push({
       pathname: '/chatbox',
       params: {
-        astrologerId: chat.mentorId,
-        astrologerName: chat.mentorName,
-        astrologerImage: chat.mentorPhoto,
-        isOnline: chat.isOnline.toString(),
-      }
+        roomId: room.id,
+        astrologerId: mentorId,
+        astrologerName: room.name,
+        astrologerImage: '',
+        isOnline: 'false',
+      },
     });
   };
 
-  const handleImageError = (chatId: string) => {
-    setChatRooms(prevRooms =>
-      prevRooms.map(room =>
-        room.id === chatId ? { ...room, imageError: true } : room
-      )
-    );
-  };
-
-  const formatTime = (dateString: string): string => {
-    // TODO: implement
-    return '';
+  const formatTime = (timestamp: any): string => {
+    if (!timestamp) return '';
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'now';
+    if (diffMins < 60) return `${diffMins}m`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
   return (
@@ -114,56 +123,33 @@ export default function ChatScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {chatRooms.map((chat) => (
+          {chatRooms.map((room) => (
             <TouchableOpacity
-              key={chat.id}
+              key={room.id}
               style={styles.chatItem}
-              onPress={() => handleChatPress(chat)}
+              onPress={() => handleChatPress(room)}
               activeOpacity={0.7}
             >
               <View style={styles.avatarContainer}>
-                {chat.imageError ? (
-                  <View style={styles.avatarFallback}>
-                    <Ionicons name="person" size={32} color="#666" />
-                  </View>
-                ) : (
-                  <Image
-                    source={{ uri: chat.mentorPhoto }}
-                    style={styles.avatar}
-                    onError={() => handleImageError(chat.id)}
-                  />
-                )}
-                {chat.isOnline && <View style={styles.onlineIndicator} />}
+                <View style={styles.avatarFallback}>
+                  <Ionicons name="person" size={32} color="#666" />
+                </View>
               </View>
 
               <View style={styles.chatContent}>
                 <View style={styles.chatHeader}>
                   <Text style={styles.mentorName} numberOfLines={1}>
-                    {chat.mentorName}
+                    {room.name}
                   </Text>
                   <Text style={styles.timeText}>
-                    {formatTime(chat.lastMessageTime)}
+                    {formatTime(room.lastMessageAt)}
                   </Text>
                 </View>
 
                 <View style={styles.chatFooter}>
-                  <Text
-                    style={[
-                      styles.lastMessage,
-                      chat.unreadCount > 0 && styles.unreadMessage
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {chat.lastMessage}
+                  <Text style={styles.lastMessage} numberOfLines={1}>
+                    {room.lastMessage ?? 'No messages yet'}
                   </Text>
-
-                  {chat.unreadCount > 0 && (
-                    <View style={styles.messageBadge}>
-                      <Text style={styles.messageBadgeText}>
-                        {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
-                      </Text>
-                    </View>
-                  )}
                 </View>
               </View>
             </TouchableOpacity>

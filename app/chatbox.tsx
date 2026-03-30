@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../contexts/UserContext';
+import { ChatService, ChatMessage } from '../services/chatService';
 
 interface Message {
   id: string;
@@ -27,15 +28,14 @@ interface Message {
   createdAt: string;
   isUser?: boolean;
 }
-
 export default function ChatBoxScreen() {
   const params = useLocalSearchParams();
-  const { astrologerId, astrologerName, astrologerImage, isOnline, sessionId, ratePerMinute } = params;
+  const { roomId, astrologerId, astrologerName, astrologerImage, isOnline, sessionId, ratePerMinute } = params;
   const { user } = useUser();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const [chatRoomId, setChatRoomId] = useState<string | null>(null);
+  const [chatRoomId, setChatRoomId] = useState<string | null>((roomId as string) ?? null);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionActive, setSessionActive] = useState(false);
   const [currentBalance, setCurrentBalance] = useState(0);
@@ -43,15 +43,16 @@ export default function ChatBoxScreen() {
   const [showLowBalanceWarning, setShowLowBalanceWarning] = useState(false);
   const [estimatedMinutes, setEstimatedMinutes] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    if (user && astrologerId) {
+    if (user && (roomId || astrologerId)) {
       initializeChatRoom();
     }
     return () => {
       cleanup();
     };
-  }, [user, astrologerId]);
+  }, [user, roomId, astrologerId]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -60,15 +61,61 @@ export default function ChatBoxScreen() {
   }, [messages]);
 
   const cleanup = () => {
-    // TODO: implement cleanup (stop timers, disconnect sockets, etc.)
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = null;
   };
 
   const initializeChatRoom = async () => {
-    // TODO: implement
+    try {
+      setIsLoading(true);
+      let activeRoomId = roomId as string;
+
+      // If no roomId passed, create a new room
+      if (!activeRoomId && user?.id && astrologerId) {
+        const room = await ChatService.createChatRoom(
+          `${user.name} & ${astrologerName}`,
+          user.id,
+          astrologerId as string
+        );
+        activeRoomId = room.id;
+      }
+
+      setChatRoomId(activeRoomId);
+
+      // Subscribe to real-time messages
+      unsubscribeRef.current = ChatService.subscribeToMessages(
+        activeRoomId,
+        (firestoreMsgs) => {
+          const mapped: Message[] = firestoreMsgs.map((m: ChatMessage) => ({
+            id: m.id,
+            content: m.text,
+            senderId: m.createdBy,
+            senderName: m.createdBy === user?.id ? (user?.name ?? 'You') : (astrologerName as string),
+            chatRoomId: m.roomId,
+            messageType: 'TEXT',
+            createdAt: m.createdAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
+            isUser: m.createdBy === user?.id,
+          }));
+          setMessages(mapped);
+        },
+        (err) => console.error('Chat listener error:', err)
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.message ?? 'Failed to load chat.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const sendMessage = async () => {
-    // TODO: implement
+    const text = inputText.trim();
+    if (!text || !chatRoomId || !user?.id) return;
+    setInputText('');
+    try {
+      await ChatService.sendMessage(chatRoomId, text, user.id);
+    } catch (error: any) {
+      Alert.alert('Error', error.message ?? 'Failed to send message.');
+    }
   };
 
   const endChatSession = async (reason: 'USER_CANCELLED' | 'INSUFFICIENT_BALANCE' | 'NORMAL_END' = 'NORMAL_END') => {
@@ -84,8 +131,9 @@ export default function ChatBoxScreen() {
   };
 
   const formatTime = (dateString: string): string => {
-    // TODO: implement
-    return '';
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   if (isLoading) {

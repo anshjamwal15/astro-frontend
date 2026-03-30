@@ -42,14 +42,16 @@ export class ChatService {
   /**
    * 1. Create a new chat room.
    *    The creator is automatically added as the first member.
+   *    Optionally pass a mentorId to add them as the second member.
    */
-  static async createChatRoom(name: string, userId: string): Promise<ChatRoom> {
+  static async createChatRoom(name: string, userId: string, mentorId?: string): Promise<ChatRoom> {
     const roomsRef = db().collection('chatRooms');
+    const members = mentorId ? [userId, mentorId] : [userId];
     const data = {
       name,
       createdBy: userId,
       createdAt: serverTimestamp(),
-      members: [userId],
+      members,
       lastMessage: null,
       lastMessageAt: null,
       lastMessageBy: null,
