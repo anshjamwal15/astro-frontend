@@ -23,8 +23,16 @@ export const NETWORK_LOGGER_CONFIG = {
   
   // URLs to exclude from logging (regex patterns)
   excludeUrls: [
-    // Example: /analytics/,
-    // Example: /tracking/,
+    /symbolicate/,
+    /10\.0\.2\.2:8081/,
+    /localhost:8081/,
+    /expo\.io/,
+    /expo\.dev/,
+    /reactnative\.dev/,
+    /\/hot\b/,
+    /\/logs\b/,
+    /\/message\b/,
+    /\/status\b/,
   ] as RegExp[],
   
   // Only log specific URLs (if empty, logs all)

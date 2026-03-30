@@ -343,13 +343,19 @@ class PushNotificationService {
       
       // Display local notification when app is in foreground
       const { notification, data } = remoteMessage;
-      
+      const notifType = data?.type?.toLowerCase();
+      const isCallNotification = notifType === 'video_call' || notifType === 'voice_call';
+
       if (notification) {
         await this.displayLocalNotification(
           notification.title || 'Notification',
           notification.body || '',
           data || {}
         );
+        // For call notifications, also run the call handler (e.g. CallKeep)
+        if (isCallNotification) {
+          await this.handleNotification(remoteMessage, 'foreground');
+        }
       } else if (data) {
         // Handle data-only messages
         await this.handleNotification(remoteMessage, 'foreground');
@@ -408,11 +414,13 @@ class PushNotificationService {
     });
 
     const notificationType = stringData.type;
+    // Normalize to lowercase so VIDEO_CALL and video_call both match
+    const normalizedType = notificationType?.toLowerCase();
 
-    switch (notificationType) {
+    switch (normalizedType) {
       case 'video_call':
       case 'voice_call':
-        await this.handleCallNotification(stringData, notificationType);
+        await this.handleCallNotification(stringData, normalizedType);
         break;
       
       case 'chat':

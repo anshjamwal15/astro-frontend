@@ -43,54 +43,7 @@ export default function ChatScreen() {
   }, [user?.id]);
 
   const loadChatRooms = async () => {
-    try {
-      setLoading(true);
-      
-      if (!user?.id) return;
-      
-      // Get user's chat rooms from backend
-      const response = await ApiService.getUserChatRooms(user.id);
-      if (response.success && response.data) {
-        const chatRoomData: ChatRoom[] = await Promise.all(
-          response.data.map(async (chatRoom: any) => {
-            // Get the last message for each chat room
-            const messagesResponse = await ApiService.getChatRoomMessagesPaginated(chatRoom.id, 0, 1);
-            const lastMessage = messagesResponse.success && messagesResponse.data?.content?.length > 0 
-              ? messagesResponse.data.content[0] 
-              : null;
-
-            // Get mentor info
-            const mentorResponse = await ApiService.getMentorById(chatRoom.mentorId);
-            const mentor = mentorResponse.success ? mentorResponse.data : null;
-
-            return {
-              id: chatRoom.id,
-              mentorId: chatRoom.mentorId || 'unknown',
-              mentorName: mentor?.name || chatRoom.name || 'Unknown Mentor',
-              mentorPhoto: mentor?.photo || `https://via.placeholder.com/60x60/4A90E2/FFFFFF?text=${(mentor?.name || 'M').charAt(0)}`,
-              lastMessage: lastMessage?.content || 'No messages yet',
-              lastMessageTime: lastMessage?.createdAt || chatRoom.createdAt || new Date().toISOString(),
-              unreadCount: 0, // TODO: Implement unread count logic
-              isOnline: Math.random() > 0.3, // TODO: Get real online status
-            };
-          })
-        );
-        
-        // Sort by last message time (most recent first)
-        chatRoomData.sort((a, b) => 
-          new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
-        );
-        
-        setChatRooms(chatRoomData);
-      } else {
-        setChatRooms([]);
-      }
-    } catch (error) {
-      console.error('Error loading chat rooms:', error);
-      setChatRooms([]);
-    } finally {
-      setLoading(false);
-    }
+    // TODO: implement
   };
 
   const onRefresh = async () => {
@@ -112,55 +65,28 @@ export default function ChatScreen() {
   };
 
   const handleImageError = (chatId: string) => {
-    setChatRooms(prevRooms => 
-      prevRooms.map(room => 
+    setChatRooms(prevRooms =>
+      prevRooms.map(room =>
         room.id === chatId ? { ...room, imageError: true } : room
       )
     );
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
-    if (diffInHours < 1) {
-      const diffInMinutes = Math.floor(diffInHours * 60);
-      return diffInMinutes < 1 ? 'Just now' : `${diffInMinutes}m ago`;
-    } else if (diffInHours < 24) {
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: true 
-      });
-    } else if (diffInHours < 48) {
-      return 'Yesterday';
-    } else if (diffInHours < 168) { // Less than a week
-      return date.toLocaleDateString('en-US', { weekday: 'short' });
-    } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
-      });
-    }
-  };
-
-  const getTotalUnreadCount = () => {
-    return chatRooms.reduce((total, room) => total + room.unreadCount, 0);
+  const formatTime = (dateString: string): string => {
+    // TODO: implement
+    return '';
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0052CC" />
-      
-      {/* Header */}
+
       <AppHeader
         firstName={firstName}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
       />
 
-      {/* Chat List */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0052CC" />
@@ -173,7 +99,7 @@ export default function ChatScreen() {
           <Text style={styles.emptySubtext}>
             Start a conversation with a mentor
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.browseMentorsButton}
             onPress={() => router.push('/(tabs)/mentors')}
           >
@@ -181,7 +107,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView 
+        <ScrollView
           style={styles.chatList}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -201,7 +127,7 @@ export default function ChatScreen() {
                     <Ionicons name="person" size={32} color="#666" />
                   </View>
                 ) : (
-                  <Image 
+                  <Image
                     source={{ uri: chat.mentorPhoto }}
                     style={styles.avatar}
                     onError={() => handleImageError(chat.id)}
@@ -209,7 +135,7 @@ export default function ChatScreen() {
                 )}
                 {chat.isOnline && <View style={styles.onlineIndicator} />}
               </View>
-              
+
               <View style={styles.chatContent}>
                 <View style={styles.chatHeader}>
                   <Text style={styles.mentorName} numberOfLines={1}>
@@ -219,9 +145,9 @@ export default function ChatScreen() {
                     {formatTime(chat.lastMessageTime)}
                   </Text>
                 </View>
-                
+
                 <View style={styles.chatFooter}>
-                  <Text 
+                  <Text
                     style={[
                       styles.lastMessage,
                       chat.unreadCount > 0 && styles.unreadMessage
@@ -230,7 +156,7 @@ export default function ChatScreen() {
                   >
                     {chat.lastMessage}
                   </Text>
-                  
+
                   {chat.unreadCount > 0 && (
                     <View style={styles.messageBadge}>
                       <Text style={styles.messageBadgeText}>

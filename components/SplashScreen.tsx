@@ -59,8 +59,9 @@ export default function SplashScreen() {
         console.log('🔑 Token preview:', jwtToken.substring(0, 50) + '...');
         
         try {
-          // Validate token with backend
-          const userData = await AuthService.tokenSignIn(jwtToken);
+          // Validate token with backend (include device token if available)
+          const deviceToken = PushNotificationService.getToken() || undefined;
+          const userData = await AuthService.tokenSignIn(jwtToken, deviceToken);
           console.log('✅ Token valid, user authenticated:', userData);
           
           // Update user data and token

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -26,11 +29,18 @@ export default function SignUpScreen() {
     confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { setUser, setJwtToken } = useUser();
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const handleSignUp = async () => {
     console.log('=== SIGNUP STARTED ===');
-    
+
     // Validation
     if (!formData.name.trim()) {
       Alert.alert('Error', 'Please enter your full name');
@@ -73,10 +83,10 @@ export default function SignUpScreen() {
     }
 
     setLoading(true);
-    
+
     try {
       console.log('📝 Attempting registration with real API...');
-      
+
       const userData = await AuthService.registerWithEmail({
         name: formData.name,
         email: formData.email,
@@ -85,9 +95,9 @@ export default function SignUpScreen() {
         dateOfBirth: formData.dateOfBirth,
         password: formData.password,
       });
-      
+
       console.log('✅ Registration successful:', userData);
-      
+
       // Set user data in context
       await setUser({
         id: userData.id,
@@ -104,11 +114,11 @@ export default function SignUpScreen() {
         await setJwtToken(userData.jwtToken);
         console.log('✅ JWT token saved');
       }
-      
+
       // Navigate to home
       router.replace('/(tabs)/home');
       Alert.alert('Success', 'Account created successfully! Welcome to the app.');
-      
+
     } catch (error: any) {
       console.error('Signup error:', error);
       Alert.alert('Registration Failed', error.message || 'Please try again.');
@@ -142,7 +152,7 @@ export default function SignUpScreen() {
   // Auto-format date of birth as user types
   const handleDOBChange = (text: string) => {
     const numericOnly = text.replace(/\D/g, '');
-    
+
     let formatted = numericOnly;
     if (numericOnly.length >= 5) {
       formatted = `${numericOnly.slice(0, 4)}-${numericOnly.slice(4, 6)}`;
@@ -150,7 +160,7 @@ export default function SignUpScreen() {
     if (numericOnly.length >= 7) {
       formatted = `${numericOnly.slice(0, 4)}-${numericOnly.slice(4, 6)}-${numericOnly.slice(6, 8)}`;
     }
-    
+
     if (formatted.length <= 10) {
       updateFormData('dateOfBirth', formatted);
     }
@@ -165,21 +175,25 @@ export default function SignUpScreen() {
   // Validate date format and range
   const isValidDate = (dateString: string) => {
     if (!dateString) return true;
-    
+
     const regex = /^\d{4}-\d{2}-\d{2}$/;
     if (!regex.test(dateString)) return false;
-    
+
     const date = new Date(dateString);
     const now = new Date();
     const minDate = new Date('1900-01-01');
-    
+
     return date >= minDate && date <= now && !isNaN(date.getTime());
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : keyboardVisible ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0}
+    >
       <StatusBar barStyle="light-content" backgroundColor="#0052CC" />
-      
+
       {/* Blue Header */}
       <LinearGradient
         colors={['#0052CC', '#0066FF']}
@@ -187,7 +201,11 @@ export default function SignUpScreen() {
       >
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Logo Section */}
         <View style={styles.logoSection}>
           <View style={styles.logoContainer}>
@@ -202,7 +220,7 @@ export default function SignUpScreen() {
         {/* Form Section */}
         <View style={styles.formSection}>
           <Text style={styles.formTitle}>Create Your Account</Text>
-          
+
           {/* Full Name */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Full Name *</Text>
@@ -335,7 +353,7 @@ export default function SignUpScreen() {
           </View>
 
           {/* Create Account Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.createAccountButton}
             onPress={handleSignUp}
             disabled={loading}
@@ -365,14 +383,14 @@ export default function SignUpScreen() {
           </View>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   header: {
     height: 100,

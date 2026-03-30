@@ -15,12 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { ApiService } from '../services/apiService';
 import { useUser } from '../contexts/UserContext';
-import { WalletService } from '../services/WalletService';
-import { BillingTimerService } from '../services/BillingTimerService';
-import { CallNotificationService } from '../services/CallNotificationService';
-import { generateVideoRoomName, generateVoiceRoomName, generateCallId, generateChatRoomName } from '../utils/roomNameGenerator';
 
 interface Message {
   id: string;
@@ -30,433 +25,67 @@ interface Message {
   chatRoomId: string;
   messageType: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM';
   createdAt: string;
-  isUser?: boolean; // Helper property for UI
+  isUser?: boolean;
 }
 
 export default function ChatBoxScreen() {
   const params = useLocalSearchParams();
   const { astrologerId, astrologerName, astrologerImage, isOnline, sessionId, ratePerMinute } = params;
   const { user } = useUser();
-  
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [chatRoomId, setChatRoomId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionActive, setSessionActive] = useState(false);
   const [currentBalance, setCurrentBalance] = useState(0);
-  const [estimatedMinutes, setEstimatedMinutes] = useState(0);
-  const [showLowBalanceWarning, setShowLowBalanceWarning] = useState(false);
   const [minutesPassed, setMinutesPassed] = useState(0);
+  const [showLowBalanceWarning, setShowLowBalanceWarning] = useState(false);
+  const [estimatedMinutes, setEstimatedMinutes] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
-  const balanceCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (user && astrologerId) {
       initializeChatRoom();
-      if (sessionId && ratePerMinute) {
-        startBillingTimer();
-        setSessionActive(true);
-      }
     }
-
     return () => {
       cleanup();
     };
-  }, [user, astrologerId, sessionId, ratePerMinute]);
+  }, [user, astrologerId]);
 
   useEffect(() => {
-    // Auto scroll to bottom when new messages are added
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, [messages]);
 
   const cleanup = () => {
-    if (balanceCheckInterval.current) {
-      clearInterval(balanceCheckInterval.current);
-      balanceCheckInterval.current = null;
-    }
-    
-    // Stop billing timer if active
-    if (sessionId) {
-      BillingTimerService.stopTimer(sessionId as string);
-    }
-  };
-
-  const startBillingTimer = () => {
-    if (!sessionId || !user || !astrologerId || !ratePerMinute) return;
-
-    const rate = parseFloat(ratePerMinute as string);
-    
-    console.log(`Starting billing timer: ₹${rate}/min`);
-
-    BillingTimerService.startTimer({
-      sessionId: sessionId as string,
-      userId: user.id,
-      mentorId: astrologerId as string,
-      sessionType: 'CHAT',
-      ratePerMinute: rate,
-      onMinuteComplete: (minutes, amountDeducted, remainingBalance) => {
-        console.log(`Minute ${minutes} completed. Deducted: ₹${amountDeducted}`);
-        setMinutesPassed(minutes);
-        setCurrentBalance(remainingBalance);
-        
-        // Show continue dialog
-        BillingTimerService.showContinueDialog(
-          minutes,
-          amountDeducted,
-          remainingBalance,
-          () => {
-            console.log('User chose to continue');
-            // Continue - do nothing, timer will keep running
-          },
-          () => {
-            console.log('User chose to cancel');
-            endChatSession('USER_CANCELLED');
-          }
-        );
-      },
-      onInsufficientBalance: (minutes, totalCost) => {
-        console.log(`Insufficient balance after ${minutes} minutes`);
-        setMinutesPassed(minutes);
-        
-        // Show insufficient balance dialog
-        BillingTimerService.showInsufficientBalanceDialog(
-          minutes,
-          totalCost,
-          () => {
-            // Navigate to add money
-            Alert.alert('Add Money', 'Please use the wallet section to add money.');
-            endChatSession('INSUFFICIENT_BALANCE');
-          },
-          () => {
-            // Cancel - end session
-            endChatSession('INSUFFICIENT_BALANCE');
-          }
-        );
-      },
-      onSessionEnd: (summary) => {
-        console.log('Session ended:', summary);
-      },
-    });
-  };
-
-  const endChatSession = async (reason: 'USER_CANCELLED' | 'INSUFFICIENT_BALANCE' | 'NORMAL_END' = 'NORMAL_END') => {
-    if (!sessionId) return;
-
-    try {
-      setSessionActive(false);
-      
-      // End the billing timer and get summary
-      const summary = await BillingTimerService.endSession(sessionId as string, reason);
-      
-      const message = reason === 'INSUFFICIENT_BALANCE' 
-        ? `Chat ended due to insufficient balance.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}`
-        : reason === 'USER_CANCELLED'
-        ? `Chat cancelled by user.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}\nRemaining Balance: ₹${summary.remainingBalance.toFixed(2)}`
-        : `Chat ended successfully.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}\nRemaining Balance: ₹${summary.remainingBalance.toFixed(2)}`;
-      
-      Alert.alert('Chat Summary', message, [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
-    } catch (error) {
-      console.error('Error ending chat session:', error);
-      router.back();
-    } finally {
-      cleanup();
-    }
+    // TODO: implement cleanup (stop timers, disconnect sockets, etc.)
   };
 
   const initializeChatRoom = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Send chat notification to mentor
-      if (user && astrologerId && sessionId) {
-        console.log('💬 Sending chat notification to mentor...');
-        const chatRoomName = generateChatRoomName(); // Short unique room name
-        const notificationResult = await CallNotificationService.sendNotificationWithAutoToken(
-          'CHAT',
-          user.name || 'User',
-          user.id,
-          astrologerId as string,
-          chatRoomName,
-          sessionId as string
-        );
-
-        if (notificationResult.success) {
-          console.log('✅ Chat notification sent successfully');
-        } else {
-          console.warn('⚠️ Failed to send chat notification:', notificationResult.message);
-          // Continue with chat even if notification fails
-        }
-      }
-      
-      // Create a unique chat room name for this user-astrologer pair
-      const roomName = `chat_${user?.id}_${astrologerId}`;
-      
-      // Try to get existing chat rooms for the user
-      const userRoomsResponse = await ApiService.getUserChatRooms(user!.id);
-      
-      let existingRoom = null;
-      if (userRoomsResponse.success && userRoomsResponse.data) {
-        // Look for existing room with this astrologer
-        existingRoom = userRoomsResponse.data.find((room: any) => 
-          room.name === roomName
-        );
-      }
-      
-      let roomId: string;
-      
-      if (existingRoom) {
-        roomId = existingRoom.id;
-        console.log('Using existing chat room:', roomId);
-      } else {
-        // Create new chat room
-        const createRoomResponse = await ApiService.createChatRoom(roomName);
-        if (!createRoomResponse.success) {
-          throw new Error('Failed to create chat room');
-        }
-        roomId = createRoomResponse.data.id;
-        console.log('Created new chat room:', roomId);
-        
-        // Join the chat room
-        await ApiService.joinChatRoom(roomId, user!.id);
-      }
-      
-      setChatRoomId(roomId);
-      
-      // Load existing messages
-      await loadMessages(roomId);
-      
-    } catch (error) {
-      console.error('Error initializing chat room:', error);
-      Alert.alert('Error', 'Failed to initialize chat. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadMessages = async (roomId: string) => {
-    try {
-      const response = await ApiService.getChatRoomMessages(roomId);
-      if (response.success && response.data) {
-        const formattedMessages = response.data.map((msg: any) => ({
-          ...msg,
-          isUser: msg.messageType === 'SYSTEM' ? false : msg.senderId === user?.id,
-        }));
-        setMessages(formattedMessages);
-        
-        // If no messages exist, add a welcome message
-        if (formattedMessages.length === 0) {
-          await sendWelcomeMessage(roomId);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    }
-  };
-
-  const sendWelcomeMessage = async (roomId: string) => {
-    try {
-      const welcomeText = `Hello! I'm ${astrologerName}. How can I help you today with your astrological questions?`;
-      
-      const response = await ApiService.sendMessage({
-        content: welcomeText,
-        senderId: user!.id,
-        chatRoomId: roomId,
-        messageType: 'SYSTEM',
-      });
-
-      if (response.success && response.data) {
-        const welcomeMessage = {
-          ...response.data,
-          isUser: false,
-          senderName: astrologerName as string,
-        };
-        setMessages([welcomeMessage]);
-      }
-    } catch (error) {
-      console.error('Error sending welcome message:', error);
-    }
+    // TODO: implement
   };
 
   const sendMessage = async () => {
-    if (!inputText.trim() || !chatRoomId || !user) {
-      return;
-    }
-
-    const messageText = inputText.trim();
-    setInputText('');
-
-    try {
-      const response = await ApiService.sendMessage({
-        content: messageText,
-        senderId: user.id,
-        chatRoomId: chatRoomId,
-        messageType: 'TEXT',
-      });
-
-      if (response.success && response.data) {
-        const newMessage = {
-          ...response.data,
-          isUser: true,
-        };
-        setMessages(prev => [...prev, newMessage]);
-        
-        // Simulate astrologer response after a delay
-        setTimeout(() => {
-          sendAstrologerResponse();
-        }, 1500);
-      } else {
-        Alert.alert('Error', 'Failed to send message. Please try again.');
-        setInputText(messageText); // Restore the message
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
-      setInputText(messageText); // Restore the message
-    }
+    // TODO: implement
   };
 
-  const sendAstrologerResponse = async () => {
-    if (!chatRoomId) return;
-
-    const responses = [
-      "Thank you for sharing that with me. Let me analyze your situation...",
-      "Based on your birth details, I can see some interesting planetary positions.",
-      "That's a very good question. In astrology, this relates to...",
-      "I understand your concern. The stars suggest...",
-      "Let me check your chart for more insights on this matter.",
-    ];
-    
-    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-    
-    try {
-      // For now, we'll simulate the astrologer response by using the user's ID
-      // but marking it as from the astrologer in the UI
-      // In a real app, astrologers would have their own user accounts
-      const response = await ApiService.sendMessage({
-        content: randomResponse,
-        senderId: user!.id, // Using user ID for now since astrologer isn't a user
-        chatRoomId: chatRoomId,
-        messageType: 'SYSTEM', // Mark as system message to differentiate
-      });
-
-      if (response.success && response.data) {
-        const astrologerMessage = {
-          ...response.data,
-          isUser: false, // Force this to be treated as astrologer message
-          senderName: astrologerName as string,
-        };
-        setMessages(prev => [...prev, astrologerMessage]);
-      }
-    } catch (error) {
-      console.error('Error sending astrologer response:', error);
-    }
+  const endChatSession = async (reason: 'USER_CANCELLED' | 'INSUFFICIENT_BALANCE' | 'NORMAL_END' = 'NORMAL_END') => {
+    // TODO: implement
   };
 
   const handleCallPress = async () => {
-    if (!user?.id || !astrologerId) {
-      Alert.alert('Error', 'Unable to start call. Please try again.');
-      return;
-    }
-
-    Alert.alert(
-      'Voice Call',
-      `Start voice call with ${astrologerName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Call', 
-          onPress: async () => {
-            try {
-              // Generate short unique IDs
-              const callId = generateCallId(); // Short unique call ID
-              const roomName = generateVoiceRoomName(); // Short unique room name
-
-              // Send voice call notification
-              console.log('📞 Sending voice call notification...');
-              const notificationResult = await CallNotificationService.sendNotificationWithAutoToken(
-                'VOICE_CALL',
-                user.name || 'User',
-                user.id,
-                astrologerId as string,
-                roomName,
-                callId
-              );
-
-              if (notificationResult.success) {
-                console.log('✅ Voice call notification sent successfully');
-                Alert.alert('Calling...', 'Voice call feature will be available soon!');
-              } else {
-                console.warn('⚠️ Failed to send voice call notification:', notificationResult.message);
-                Alert.alert('Error', 'Failed to initiate call. Please try again.');
-              }
-            } catch (error) {
-              console.error('Error starting voice call:', error);
-              Alert.alert('Error', 'Failed to start call. Please try again.');
-            }
-          }
-        }
-      ]
-    );
+    // TODO: implement
   };
 
   const handleVideoCallPress = async () => {
-    if (!user?.id || !astrologerId) {
-      Alert.alert('Error', 'Unable to start video call. Please try again.');
-      return;
-    }
-
-    Alert.alert(
-      'Video Call',
-      `Start video call with ${astrologerName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Start', 
-          onPress: async () => {
-            try {
-              // Generate short unique IDs
-              const callId = generateCallId(); // Short unique call ID
-              const roomName = generateVideoRoomName(); // Short unique room name
-
-              // Send video call notification
-              console.log('📹 Sending video call notification...');
-              const notificationResult = await CallNotificationService.sendNotificationWithAutoToken(
-                'VIDEO_CALL',
-                user.name || 'User',
-                user.id,
-                astrologerId as string,
-                roomName,
-                callId
-              );
-
-              if (notificationResult.success) {
-                console.log('✅ Video call notification sent successfully');
-                Alert.alert('Starting...', 'Video call feature will be available soon!');
-              } else {
-                console.warn('⚠️ Failed to send video call notification:', notificationResult.message);
-                Alert.alert('Error', 'Failed to initiate video call. Please try again.');
-              }
-            } catch (error) {
-              console.error('Error starting video call:', error);
-              Alert.alert('Error', 'Failed to start video call. Please try again.');
-            }
-          }
-        }
-      ]
-    );
+    // TODO: implement
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: false 
-    });
+  const formatTime = (dateString: string): string => {
+    // TODO: implement
+    return '';
   };
 
   if (isLoading) {
@@ -468,28 +97,28 @@ export default function ChatBoxScreen() {
   }
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
-      
+
       {/* Header */}
       <LinearGradient
         colors={['#4CAF50', '#45A049']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
           >
             <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
           </TouchableOpacity>
-          
+
           <View style={styles.astrologerInfo}>
             <View style={styles.astrologerImageContainer}>
-              <Image 
+              <Image
                 source={{ uri: astrologerImage as string }}
                 style={styles.astrologerImage}
               />
@@ -507,22 +136,16 @@ export default function ChatBoxScreen() {
               )}
             </View>
           </View>
-          
+
           <View style={styles.headerActions}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => handleCallPress()}
-            >
+            <TouchableOpacity style={styles.actionButton} onPress={handleCallPress}>
               <Ionicons name="call" size={16} color="#FFFFFF" />
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => handleVideoCallPress()}
-            >
+            <TouchableOpacity style={styles.actionButton} onPress={handleVideoCallPress}>
               <Ionicons name="videocam" size={16} color="#FFFFFF" />
             </TouchableOpacity>
             {sessionActive && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.actionButton, styles.endChatButton]}
                 onPress={() => endChatSession('NORMAL_END')}
               >
@@ -552,7 +175,7 @@ export default function ChatBoxScreen() {
       )}
 
       {/* Chat Messages */}
-      <ScrollView 
+      <ScrollView
         ref={scrollViewRef}
         style={styles.messagesContainer}
         showsVerticalScrollIndicator={false}
@@ -566,7 +189,7 @@ export default function ChatBoxScreen() {
             ]}
           >
             {!message.isUser && (
-              <Image 
+              <Image
                 source={{ uri: astrologerImage as string }}
                 style={styles.messageAvatar}
               />
@@ -604,7 +227,7 @@ export default function ChatBoxScreen() {
           <TouchableOpacity style={styles.attachButton}>
             <Ionicons name="attach" size={20} color="#666" />
           </TouchableOpacity>
-          
+
           <TextInput
             style={styles.textInput}
             value={inputText}
@@ -614,12 +237,12 @@ export default function ChatBoxScreen() {
             multiline
             maxLength={500}
           />
-          
+
           <TouchableOpacity style={styles.emojiButton}>
             <Ionicons name="happy" size={20} color="#666" />
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={[
               styles.sendButton,
               inputText.trim() ? styles.sendButtonActive : styles.sendButtonInactive
@@ -772,10 +395,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomLeftRadius: 5,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,

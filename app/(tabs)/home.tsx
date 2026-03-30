@@ -165,46 +165,6 @@ export default function HomeScreen() {
     if (true) {
       Alert.alert('Error', 'Chat feature is not working for now');
       return;
-    }
-
-    if (!user?.id) {
-      Alert.alert('Error', 'Please login to start a chat.');
-      return;
-    }
-
-    // If astrologer data is provided, start a chat session
-    if (astrologer) {
-      try {
-        const chatRate = astrologer.rate || astrologer.price || 17;
-        const sessionId = generateSessionId('chat'); // Short unique ID
-        
-        // Start the session
-        const sessionStatus = await WalletService.startSession(
-          sessionId,
-          user.id,
-          astrologer.id,
-          'CHAT'
-        );
-
-        if (sessionStatus.status === 'STARTED') {
-          router.push({
-            pathname: '/chatbox',
-            params: {
-              astrologerId: astrologer.id.toString(),
-              astrologerName: astrologer.name,
-              astrologerImage: astrologer.image || `https://via.placeholder.com/60x60/4A90E2/FFFFFF?text=${astrologer.name.charAt(0)}`,
-              isOnline: astrologer.isOnline ?? false,
-              sessionId: sessionId,
-              ratePerMinute: chatRate.toString(),
-            }
-          });
-        } else {
-          Alert.alert('Error', sessionStatus.message || 'Failed to start chat session');
-        }
-      } catch (error: any) {
-        console.error('Error starting chat:', error);
-        Alert.alert('Error', 'Unable to start chat. Please try again.');
-      }
     } else {
       // Navigate to chat list
       router.push('/(tabs)/chat');
@@ -344,7 +304,6 @@ export default function HomeScreen() {
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity 
             style={styles.actionButton}
-            // onPress={() => router.push('/(tabs)/call')}
           >
             <Ionicons name="call" size={24} color="#333" />
             <Text style={styles.actionButtonText}>Call an Mentor</Text>

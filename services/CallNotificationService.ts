@@ -205,39 +205,36 @@ export class CallNotificationService {
   }
 
   /**
-   * Get device token for a specific mentor from the mentor list API
-   * @param mentorId - The mentor's user ID or mentor ID
+   * Get device token for a specific mentor by fetching their profile directly
+   * @param mentorId - The mentor's ID
    * @returns Device token or null if not found
    */
   static async getDeviceToken(mentorId: string): Promise<string | null> {
     try {
       console.log(`🔍 Looking up device token for mentor: ${mentorId}`);
-      
-      // Fetch mentor list from backend
-      const mentors = await this.fetchMentorList();
-      
-      if (mentors.length === 0) {
-        console.warn('⚠️ No mentors found in the list');
+
+      const response = await fetch(`${this.baseUrl}/api/mentor/${mentorId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/hal+json',
+        },
+      });
+
+      if (!response.ok) {
+        console.error(`❌ Failed to fetch mentor ${mentorId}:`, response.status);
         return null;
       }
 
-      // Find mentor by ID (check both id and userId fields)
-      const mentor = mentors.find(m => m.id === mentorId || m.userId === mentorId);
-      
-      if (!mentor) {
-        console.warn(`⚠️ Mentor not found with ID: ${mentorId}`);
-        console.log('Available mentor IDs:', mentors.map(m => ({ id: m.id, userId: m.userId })));
-        return null;
-      }
+      const mentor = await response.json();
 
-      if (!mentor.deviceToken) {
+      if (!mentor.device_token) {
         console.warn(`⚠️ Mentor ${mentor.name} (${mentorId}) has no device token registered`);
         return null;
       }
 
       console.log(`✅ Found device token for mentor ${mentor.name} (${mentorId})`);
-      console.log(`📱 Device token: ${mentor.deviceToken.substring(0, 50)}...`);
-      return mentor.deviceToken;
+      console.log(`📱 Device token: ${mentor.device_token.substring(0, 50)}...`);
+      return mentor.device_token;
     } catch (error: any) {
       console.error('❌ Error getting device token:', error);
       return null;
