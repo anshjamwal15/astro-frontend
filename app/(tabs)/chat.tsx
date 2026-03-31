@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useUser, getFirstName } from '../../contexts/UserContext';
 import AppHeader from '../../components/AppHeader';
 import { ChatService, ChatRoom as FirestoreChatRoom } from '../../services/chatService';
-
+import { logger } from '../../utils/Logger';
 
 export default function ChatScreen() {
   const [chatRooms, setChatRooms] = useState<FirestoreChatRoom[]>([]);
@@ -65,6 +65,7 @@ export default function ChatScreen() {
       pathname: '/chatbox',
       params: {
         roomId: room.id,
+        roomName: room.roomName ?? '',
         astrologerId: mentorId,
         astrologerName: room.name,
         astrologerImage: '',
@@ -139,7 +140,7 @@ export default function ChatScreen() {
               <View style={styles.chatContent}>
                 <View style={styles.chatHeader}>
                   <Text style={styles.mentorName} numberOfLines={1}>
-                    {room.name}
+                    {room.name ?? room.id}
                   </Text>
                   <Text style={styles.timeText}>
                     {formatTime(room.lastMessageAt)}
@@ -260,6 +261,11 @@ const styles = StyleSheet.create({
     color: '#000',
     flex: 1,
     marginRight: 10,
+  },
+  roomNameHint: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#999',
   },
   timeText: {
     fontSize: 13,

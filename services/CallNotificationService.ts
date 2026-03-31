@@ -153,49 +153,6 @@ export class CallNotificationService {
   }
 
   /**
-   * Fetch mentor list from backend with caching
-   */
-  static async fetchMentorList(): Promise<MentorData[]> {
-    try {
-      // Check if cache is still valid
-      const now = Date.now();
-      if (this.mentorListCache.length > 0 && (now - this.mentorListCacheTime) < this.CACHE_DURATION) {
-        console.log('📋 Using cached mentor list');
-        return this.mentorListCache;
-      }
-
-      console.log('📋 Fetching mentor list from backend...');
-      
-      const response = await fetch(`${this.baseUrl}/api/mentor/list`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/hal+json',
-        },
-      });
-
-      if (!response.ok) {
-        console.error('❌ Failed to fetch mentor list:', response.status);
-        // Return cached data if available, even if expired
-        return this.mentorListCache;
-      }
-
-      const paginated: { items: MentorData[]; page: number; size: number; total: number } = await response.json();
-      const mentors = paginated.items;
-      console.log(`✅ Fetched ${mentors.length} mentors from backend (total: ${paginated.total})`);
-      
-      // Update cache
-      this.mentorListCache = mentors;
-      this.mentorListCacheTime = now;
-      
-      return mentors;
-    } catch (error: any) {
-      console.error('❌ Error fetching mentor list:', error);
-      // Return cached data if available
-      return this.mentorListCache;
-    }
-  }
-
-  /**
    * Clear the mentor list cache (useful after mentor updates)
    */
   static clearMentorCache(): void {

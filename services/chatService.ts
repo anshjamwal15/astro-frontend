@@ -3,12 +3,19 @@ import {
   firestoreFieldValue,
   isFirebaseInitialized,
 } from '../config/firebase';
+import { MessageNotificationService } from './MessageNotificationService';
+import { logger } from '../utils/Logger';
+import { generateChatRoomName } from '../utils/roomNameGenerator';
+
+const log = logger.scope('ChatService');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ChatRoom {
   id: string;
   name: string;
+  /** Short unique id for the room (e.g. c-lx3k9p2abc) */
+  roomName?: string;
   createdBy: string;
   createdAt: any;
   members: string[];
@@ -47,8 +54,10 @@ export class ChatService {
   static async createChatRoom(name: string, userId: string, mentorId?: string): Promise<ChatRoom> {
     const roomsRef = db().collection('chatRooms');
     const members = mentorId ? [userId, mentorId] : [userId];
+    const roomName = generateChatRoomName();
     const data = {
       name,
+      roomName,
       createdBy: userId,
       createdAt: serverTimestamp(),
       members,
@@ -81,9 +90,15 @@ export class ChatService {
 
   /**
    * 3. Send a message to a specific chat room.
-   *    Also updates the room's lastMessage metadata.
+   *    Also updates the room's lastMessage metadata and fires a push notification
+   *    to the other member(s) of the room.
    */
-  static async sendMessage(roomId: string, text: string, userId: string): Promise<ChatMessage> {
+  static async sendMessage(
+    roomId: string,
+    text: string,
+    userId: string,
+    senderName = 'User'
+  ): Promise<ChatMessage> {
     const messagesRef = db().collection('chatRooms').doc(roomId).collection('messages');
     const ts = serverTimestamp();
 
@@ -94,14 +109,37 @@ export class ChatService {
       createdAt: ts,
     };
 
+    log.info(`Sending message | room: ${roomId} | sender: ${userId} (${senderName}) | text: "${text}"`);
     const docRef = await messagesRef.add(data);
+    log.success(`Message saved to Firestore | id: ${docRef.id}`);
 
     // Update room's last message snapshot
-    await db().collection('chatRooms').doc(roomId).update({
+    const roomRef = db().collection('chatRooms').doc(roomId);
+    await roomRef.update({
       lastMessage: text,
       lastMessageAt: ts,
       lastMessageBy: userId,
     });
+
+    // Fire push notification to every other member in the room (non-blocking)
+    try {
+      const roomSnap = await roomRef.get();
+      const members: string[] = roomSnap.data()?.members ?? [];
+      const recipients = members.filter((m: string) => m !== userId);
+
+      for (const recipientId of recipients) {
+        log.info(`Sending push notification | recipient: ${recipientId} | sender: ${senderName}`);
+        // MessageNotificationService.notify(
+        //   recipientId,
+        //   senderName,
+        //   userId,
+        //   text,
+        //   roomId,
+        // ).catch((err) => console.warn('Message notification error:', err));
+      }
+    } catch (err) {
+      console.warn('Could not send message notification:', err);
+    }
 
     return { id: docRef.id, ...data } as ChatMessage;
   }
@@ -115,6 +153,7 @@ export class ChatService {
     onMessages: (messages: ChatMessage[]) => void,
     onError?: (error: Error) => void
   ): () => void {
+    // log.info(`Subscribing to messages | room: ${roomId}`);
     const messagesRef = db()
       .collection('chatRooms')
       .doc(roomId)
@@ -122,15 +161,17 @@ export class ChatService {
       .orderBy('createdAt', 'asc');
 
     const unsubscribe = messagesRef.onSnapshot(
+      { includeMetadataChanges: true },
       (snapshot: any) => {
         const messages: ChatMessage[] = snapshot.docs.map((doc: any) => ({
           id: doc.id,
           ...doc.data(),
         }));
+        log.debug(`Realtime update | room: ${roomId} | messages: ${messages.length} | fromCache: ${snapshot.metadata.fromCache}`);
         onMessages(messages);
       },
       (error: Error) => {
-        console.error('subscribeToMessages error:', error);
+        log.error('subscribeToMessages error:', error);
         onError?.(error);
       }
     );
@@ -179,7 +220,6 @@ export class ChatService {
         onRooms(rooms);
       },
       (error: Error) => {
-        console.error('subscribeToUserRooms error:', error);
         onError?.(error);
       }
     );

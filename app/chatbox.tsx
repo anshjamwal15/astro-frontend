@@ -30,29 +30,46 @@ interface Message {
 }
 export default function ChatBoxScreen() {
   const params = useLocalSearchParams();
-  const { roomId, astrologerId, astrologerName, astrologerImage, isOnline, sessionId, ratePerMinute } = params;
+  const {
+    roomId,
+    roomName: roomNameParam,
+    astrologerId,
+    astrologerName,
+    astrologerImage,
+    isOnline,
+    ratePerMinute,
+    currentUserId: paramCurrentUserId,
+  } = params;
   const { user } = useUser();
+
+  // Support both regular users (UserContext) and mentors (currentUserId param)
+  const activeUserId: string | undefined = user?.id ?? (paramCurrentUserId as string | undefined);
+  const activeUserName: string = user?.name ?? 'Mentor';
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [chatRoomId, setChatRoomId] = useState<string | null>((roomId as string) ?? null);
+  const [displayRoomName, setDisplayRoomName] = useState<string | undefined>(
+    typeof roomNameParam === 'string' && roomNameParam.length > 0 ? roomNameParam : undefined
+  );
   const [isLoading, setIsLoading] = useState(true);
-  const [sessionActive, setSessionActive] = useState(false);
-  const [currentBalance, setCurrentBalance] = useState(0);
-  const [minutesPassed, setMinutesPassed] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sessionActive] = useState(false);
+  const [currentBalance] = useState(0);
+  const [minutesPassed] = useState(0);
   const [showLowBalanceWarning, setShowLowBalanceWarning] = useState(false);
-  const [estimatedMinutes, setEstimatedMinutes] = useState(0);
+  const [estimatedMinutes] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    if (user && (roomId || astrologerId)) {
+    if (activeUserId && (roomId || astrologerId)) {
       initializeChatRoom();
     }
     return () => {
       cleanup();
     };
-  }, [user, roomId, astrologerId]);
+  }, [activeUserId, roomId, astrologerId]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -65,19 +82,51 @@ export default function ChatBoxScreen() {
     unsubscribeRef.current = null;
   };
 
+  const refreshMessages = async () => {
+    if (!chatRoomId && !roomId) return;
+    const activeRoomId = chatRoomId ?? (roomId as string);
+    setIsRefreshing(true);
+    cleanup();
+    console.log('🔄 [ChatBox] Manually refreshing messages for room:', activeRoomId);
+    unsubscribeRef.current = ChatService.subscribeToMessages(
+      activeRoomId,
+      (firestoreMsgs) => {
+        const mapped: Message[] = firestoreMsgs.map((m: ChatMessage) => ({
+          id: m.id,
+          content: m.text,
+          senderId: m.createdBy,
+          senderName: m.createdBy === activeUserId ? activeUserName : (astrologerName as string),
+          chatRoomId: m.roomId,
+          messageType: 'TEXT',
+          createdAt: m.createdAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
+          isUser: m.createdBy === activeUserId,
+        }));
+        setMessages(mapped);
+        setIsRefreshing(false);
+      },
+      (err) => {
+        console.error('🔄 [ChatBox] Refresh listener error:', err);
+        setIsRefreshing(false);
+      }
+    );
+  };
+
   const initializeChatRoom = async () => {
     try {
       setIsLoading(true);
       let activeRoomId = roomId as string;
 
       // If no roomId passed, create a new room
-      if (!activeRoomId && user?.id && astrologerId) {
+      if (!activeRoomId && activeUserId && astrologerId) {
         const room = await ChatService.createChatRoom(
-          `${user.name} & ${astrologerName}`,
-          user.id,
+          `${activeUserName} & ${astrologerName}`,
+          activeUserId,
           astrologerId as string
         );
         activeRoomId = room.id;
+        if (room.roomName) {
+          setDisplayRoomName(room.roomName);
+        }
       }
 
       setChatRoomId(activeRoomId);
@@ -90,11 +139,11 @@ export default function ChatBoxScreen() {
             id: m.id,
             content: m.text,
             senderId: m.createdBy,
-            senderName: m.createdBy === user?.id ? (user?.name ?? 'You') : (astrologerName as string),
+            senderName: m.createdBy === activeUserId ? activeUserName : (astrologerName as string),
             chatRoomId: m.roomId,
             messageType: 'TEXT',
             createdAt: m.createdAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
-            isUser: m.createdBy === user?.id,
+            isUser: m.createdBy === activeUserId,
           }));
           setMessages(mapped);
         },
@@ -109,16 +158,16 @@ export default function ChatBoxScreen() {
 
   const sendMessage = async () => {
     const text = inputText.trim();
-    if (!text || !chatRoomId || !user?.id) return;
+    if (!text || !chatRoomId || !activeUserId) return;
     setInputText('');
     try {
-      await ChatService.sendMessage(chatRoomId, text, user.id);
+      await ChatService.sendMessage(chatRoomId, text, activeUserId, activeUserName);
     } catch (error: any) {
       Alert.alert('Error', error.message ?? 'Failed to send message.');
     }
   };
 
-  const endChatSession = async (reason: 'USER_CANCELLED' | 'INSUFFICIENT_BALANCE' | 'NORMAL_END' = 'NORMAL_END') => {
+  const endChatSession = async (_reason: 'USER_CANCELLED' | 'INSUFFICIENT_BALANCE' | 'NORMAL_END' = 'NORMAL_END') => {
     // TODO: implement
   };
 
@@ -150,7 +199,6 @@ export default function ChatBoxScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
-
       {/* Header */}
       <LinearGradient
         colors={['#4CAF50', '#45A049']}
@@ -174,6 +222,11 @@ export default function ChatBoxScreen() {
             </View>
             <View style={styles.astrologerDetails}>
               <Text style={styles.astrologerName}>{astrologerName}</Text>
+              {displayRoomName ? (
+                <Text style={styles.roomNameLabel} numberOfLines={1}>
+                  {displayRoomName}
+                </Text>
+              ) : null}
               <Text style={styles.onlineStatus}>
                 {isOnline === 'true' ? 'Online' : 'Offline'}
               </Text>
@@ -191,6 +244,13 @@ export default function ChatBoxScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={handleVideoCallPress}>
               <Ionicons name="videocam" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={refreshMessages}
+              disabled={isRefreshing}
+            >
+              <Ionicons name={isRefreshing ? 'hourglass' : 'refresh'} size={16} color="#FFFFFF" />
             </TouchableOpacity>
             {sessionActive && (
               <TouchableOpacity
@@ -364,6 +424,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  roomNameLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   onlineStatus: {
     fontSize: 14,

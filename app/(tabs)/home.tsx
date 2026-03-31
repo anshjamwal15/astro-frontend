@@ -172,12 +172,24 @@ export default function HomeScreen() {
     try {
       setLoading(true);
       const { ChatService } = await import('../../services/chatService');
+      const { MessageNotificationService } = await import('../../services/MessageNotificationService');
       const roomName = `${user.name} & ${astrologer.name}`;
       const room = await ChatService.createChatRoom(roomName, user.id, astrologer.id);
+
+      // Notify the astrologer about the new chat
+      MessageNotificationService.notify(
+        astrologer.id,
+        user.name,
+        user.id,
+        `${user.name} wants to start a consultation with you.`,
+        room.id,
+      ).catch((err) => console.warn('Notification failed:', err));
+
       router.push({
         pathname: '/chatbox',
         params: {
           roomId: room.id,
+          roomName: room.roomName ?? '',
           astrologerId: astrologer.id,
           astrologerName: astrologer.name,
           astrologerImage: astrologer.image ?? '',

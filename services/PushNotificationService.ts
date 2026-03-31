@@ -775,7 +775,7 @@ class PushNotificationService {
           params: {
             astrologerId: data.senderId || '',
             astrologerName: data.senderName || '',
-            chatRoomId: data.chatRoomId || '',
+            roomId: data.chatRoomId || '',
           },
         });
         break;
