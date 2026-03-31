@@ -776,6 +776,7 @@ class PushNotificationService {
             astrologerId: data.senderId || '',
             astrologerName: data.senderName || '',
             roomId: data.chatRoomId || '',
+            // roomName: data.roomName || '', // TODO: add room name from server side first
           },
         });
         break;

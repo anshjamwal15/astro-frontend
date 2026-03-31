@@ -222,13 +222,13 @@ export default function ChatBoxScreen() {
             </View>
             <View style={styles.astrologerDetails}>
               <Text style={styles.astrologerName}>{astrologerName}</Text>
-              {displayRoomName ? (
+              {/* {displayRoomName ? (
                 <Text style={styles.roomNameLabel} numberOfLines={1}>
                   {displayRoomName}
                 </Text>
-              ) : null}
+              ) : null} */}
               <Text style={styles.onlineStatus}>
-                {isOnline === 'true' ? 'Online' : 'Offline'}
+                {/* {isOnline === 'true' ? 'Online' : 'Offline'} */} {/* TODO: add online status from server side first */}
               </Text>
               {sessionActive && (
                 <Text style={styles.billingInfo}>
