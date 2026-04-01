@@ -169,39 +169,53 @@ export default function HomeScreen() {
       return;
     }
 
-    try {
-      setLoading(true);
-      const { ChatService } = await import('../../services/chatService');
-      const { MessageNotificationService } = await import('../../services/MessageNotificationService');
-      const roomName = `${user.name} & ${astrologer.name}`;
-      const room = await ChatService.createChatRoom(roomName, user.id, astrologer.id);
+    const chatRate = astrologer.rate || astrologer.price || 17;
 
-      // Notify the astrologer about the new chat
-      MessageNotificationService.notify(
-        astrologer.id,
-        user.name,
-        user.id,
-        `${user.name} wants to start a consultation with you.`,
-        room.id,
-      ).catch((err) => console.warn('Notification failed:', err));
+    Alert.alert(
+      'Start Chat',
+      `Chat with ${astrologer.name}\nRate: ₹${chatRate}/min\n\nDo you want to start the chat?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start Chat',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const { ChatService } = await import('../../services/chatService');
+              const { MessageNotificationService } = await import('../../services/MessageNotificationService');
+              const roomName = `${user.name} & ${astrologer.name}`;
+              const room = await ChatService.createChatRoom(roomName, user.id, astrologer.id);
 
-      router.push({
-        pathname: '/chatbox',
-        params: {
-          roomId: room.id,
-          roomName: room.roomName ?? '',
-          astrologerId: astrologer.id,
-          astrologerName: astrologer.name,
-          astrologerImage: astrologer.image ?? '',
-          isOnline: (astrologer.isOnline ?? false).toString(),
-          ratePerMinute: (astrologer.rate || astrologer.price || 17).toString(),
+              // Notify the astrologer about the new chat
+              MessageNotificationService.notify(
+                astrologer.id,
+                user.name,
+                user.id,
+                `${user.name} wants to start a consultation with you.`,
+                room.id,
+              ).catch((err) => console.warn('Notification failed:', err));
+
+              router.push({
+                pathname: '/chatbox',
+                params: {
+                  roomId: room.id,
+                  roomName: room.roomName ?? '',
+                  astrologerId: astrologer.id,
+                  astrologerName: astrologer.name,
+                  astrologerImage: astrologer.image ?? '',
+                  isOnline: (astrologer.isOnline ?? false).toString(),
+                  ratePerMinute: chatRate.toString(),
+                },
+              });
+            } catch (error: any) {
+              Alert.alert('Error', error.message ?? 'Failed to create chat room.');
+            } finally {
+              setLoading(false);
+            }
+          },
         },
-      });
-    } catch (error: any) {
-      Alert.alert('Error', error.message ?? 'Failed to create chat room.');
-    } finally {
-      setLoading(false);
-    }
+      ]
+    );
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,12 +13,11 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser, getFirstName } from '../../contexts/UserContext';
-import { WalletService } from '../../services/WalletService';
 import { ApiService } from '../../services/apiService';
 import { generateVideoRoomName, generateSessionId } from '../../utils/roomNameGenerator';
 import AppHeader from '../../components/AppHeader';
@@ -75,6 +74,26 @@ export default function MentorsScreen() {
   });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const scaleRefs = useRef<Record<string, Animated.Value>>({});
+
+  const getScale = (id: string) => {
+    if (!scaleRefs.current[id]) scaleRefs.current[id] = new Animated.Value(1);
+    return scaleRefs.current[id];
+  };
+
+  const toggleFavorite = (mentorId: string) => {
+    const scale = getScale(mentorId);
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 1.4, useNativeDriver: true, speed: 40, bounciness: 12 }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 }),
+    ]).start();
+    setFavorites(prev => {
+      const next = new Set(prev);
+      next.has(mentorId) ? next.delete(mentorId) : next.add(mentorId);
+      return next;
+    });
+  };
   const { user } = useUser();
   const firstName = user ? getFirstName(user.name) : 'User';
 
@@ -186,39 +205,53 @@ export default function MentorsScreen() {
       Alert.alert('Error', 'Please login to start a chat.');
       return;
     }
-    try {
-      const balanceCheck = await WalletService.canStartSession(user.id, 'CHAT');
-      if (!balanceCheck.canStart) {
-        Alert.alert(
-          'Insufficient Balance',
-          balanceCheck.message + '\n\nWould you like to add money to your wallet?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Add Money', onPress: () => Alert.alert('Add Money', 'Use the "Add Money" button in the wallet section above.') },
-          ]
-        );
-        return;
-      }
-      const sessionId = generateSessionId('chat');
-      const sessionStatus = await WalletService.startSession(sessionId, user.id, mentor.id, 'CHAT');
-      if (sessionStatus.status === 'STARTED') {
-        router.push({
-          pathname: '/chatbox',
-          params: {
-            astrologerId: mentor.id,
-            astrologerName: mentor.name,
-            astrologerImage: mentor.photo,
-            isOnline: mentor.isOnline.toString(),
-            sessionId,
-            ratePerMinute: sessionStatus.ratePerMinute.toString(),
+
+    const chatRate = mentor.rate || mentor.price || 17;
+
+    Alert.alert(
+      'Start Chat',
+      `Chat with ${mentor.name}\nRate: ₹${chatRate}/min\n\nDo you want to start the chat?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start Chat',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const { ChatService } = await import('../../services/chatService');
+              const { MessageNotificationService } = await import('../../services/MessageNotificationService');
+              const roomName = `${user.name} & ${mentor.name}`;
+              const room = await ChatService.createChatRoom(roomName, user.id, mentor.id);
+
+              MessageNotificationService.notify(
+                mentor.id,
+                user.name,
+                user.id,
+                `${user.name} wants to start a consultation with you.`,
+                room.id,
+              ).catch((err) => console.warn('Notification failed:', err));
+
+              router.push({
+                pathname: '/chatbox',
+                params: {
+                  roomId: room.id,
+                  roomName: room.roomName ?? '',
+                  astrologerId: mentor.id,
+                  astrologerName: mentor.name,
+                  astrologerImage: mentor.photo ?? '',
+                  isOnline: mentor.isOnline.toString(),
+                  ratePerMinute: chatRate.toString(),
+                },
+              });
+            } catch (error: any) {
+              Alert.alert('Error', error.message ?? 'Failed to create chat room.');
+            } finally {
+              setLoading(false);
+            }
           },
-        });
-      } else {
-        Alert.alert('Error', sessionStatus.message || 'Failed to start chat session');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', 'Unable to check balance. Please try again.');
-    }
+        },
+      ]
+    );
   };
 
   const handleVideoCallPress = async (mentor: Mentor) => {
@@ -329,7 +362,7 @@ export default function MentorsScreen() {
                           onError={() => setImageErrors(prev => new Set(prev).add(mentor.id))}
                         />
                       )}
-                      {mentor.isOnline && <View style={styles.onlineIndicator} />}
+
                     </View>
 
                     <View style={styles.astrologerDetails}>
@@ -351,6 +384,19 @@ export default function MentorsScreen() {
                   </View>
 
                   <View style={styles.priceAndAction}>
+                    <TouchableOpacity
+                      style={[styles.favoriteButton, favorites.has(mentor.id) && styles.favoriteButtonActive]}
+                      onPress={() => toggleFavorite(mentor.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Animated.View style={{ transform: [{ scale: getScale(mentor.id) }] }}>
+                        <Ionicons
+                          name={favorites.has(mentor.id) ? 'heart' : 'heart-outline'}
+                          size={18}
+                          color={favorites.has(mentor.id) ? '#E53935' : '#AAAAAA'}
+                        />
+                      </Animated.View>
+                    </TouchableOpacity>
                     <View style={styles.priceContainer}>
                       <View style={styles.rateRow}>
                         <Ionicons name="chatbubbles-outline" size={12} color="#4CAF50" />
@@ -508,21 +554,32 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
     backgroundColor: '#FFFFFF',
   },
+  favoriteButton: {
+    alignSelf: 'flex-end',
+    marginBottom: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  favoriteButtonActive: {
+    backgroundColor: '#FFF0F0',
+    shadowColor: '#E53935',
+    shadowOpacity: 0.2,
+    elevation: 4,
+  },
   astrologerInfo: { flex: 1, flexDirection: 'row' },
   astrologerImageContainer: { position: 'relative', marginRight: 15 },
   astrologerImage: { width: 60, height: 60, borderRadius: 30 },
   fallbackIconContainer: { backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
+
   astrologerDetails: { flex: 1 },
   astrologerName: { fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 4 },
   specialization: { fontSize: 14, color: '#666', marginBottom: 2 },
