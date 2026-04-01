@@ -82,19 +82,39 @@ export default function MentorsScreen() {
     return scaleRefs.current[id];
   };
 
-  const toggleFavorite = (mentorId: string) => {
+  const toggleFavorite = async (mentorId: string) => {
+    if (!user?.id) return;
+
+    const isFav = favorites.has(mentorId);
     const scale = getScale(mentorId);
+
+    // Optimistic update
+    setFavorites(prev => {
+      const next = new Set(prev);
+      isFav ? next.delete(mentorId) : next.add(mentorId);
+      return next;
+    });
+
+    // Bounce animation
     Animated.sequence([
       Animated.spring(scale, { toValue: 1.4, useNativeDriver: true, speed: 40, bounciness: 12 }),
       Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 }),
     ]).start();
-    setFavorites(prev => {
-      const next = new Set(prev);
-      next.has(mentorId) ? next.delete(mentorId) : next.add(mentorId);
-      return next;
-    });
+
+    const result = isFav
+      ? await ApiService.removeFavorite(user.id, mentorId)
+      : await ApiService.addFavorite(user.id, mentorId);
+
+    if (!result.success) {
+      // Rollback on failure
+      setFavorites(prev => {
+        const next = new Set(prev);
+        isFav ? next.add(mentorId) : next.delete(mentorId);
+        return next;
+      });
+    }
   };
-  const { user } = useUser();
+  const { user, jwtToken } = useUser();
   const firstName = user ? getFirstName(user.name) : 'User';
 
   const hasActiveFilters =
@@ -107,6 +127,7 @@ export default function MentorsScreen() {
       const params: Parameters<typeof ApiService.getMentors>[0] = {
         page: pageNum,
         size: PAGE_SIZE,
+        token: jwtToken ?? undefined,
       };
       const cat = category !== 'All' ? category : filters.category;
       if (cat) params.category = cat;
@@ -115,7 +136,7 @@ export default function MentorsScreen() {
       if (filters.nationality) params.nationality = filters.nationality;
       return params;
     },
-    []
+    [jwtToken]
   );
 
   const loadCategories = async () => {
@@ -152,6 +173,19 @@ export default function MentorsScreen() {
           }));
           setMentors(prev => (append ? [...prev, ...mapped] : mapped));
           setTotal(response.pagination?.total ?? mapped.length);
+          // Seed favorites from API fav field
+          if (!append) {
+            const favIds = response.data
+              .filter((m: any) => m.fav === true)
+              .map((m: any) => m.id);
+            setFavorites(new Set(favIds));
+          } else {
+            setFavorites(prev => {
+              const next = new Set(prev);
+              response.data!.forEach((m: any) => { if (m.fav) next.add(m.id); });
+              return next;
+            });
+          }
         }
       } catch (error) {
         console.error('Error loading mentors:', error);

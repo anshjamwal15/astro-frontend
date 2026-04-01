@@ -66,6 +66,7 @@ export interface MentorData {
   price?: number;
   rate?: number;
   originalPrice?: number;
+  fav?: boolean;
 }
 
 interface PaginatedResponse<T> {
@@ -300,6 +301,7 @@ export class ApiService {
     totalRatings?: number;
     nationality?: string;
     category?: string;
+    token?: string;
   }): Promise<ApiResponse<MentorData[]> & { pagination?: { page: number; size: number; total: number } }> {
     try {
       const query = new URLSearchParams();
@@ -312,8 +314,13 @@ export class ApiService {
 
       const url = `${this.baseUrl}/api/mentor/list${query.toString() ? '?' + query.toString() : ''}`;
       console.log('Fetching mentors from:', url);
-      
-      const response = await fetch(url);
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/hal+json',
+      };
+      if (params?.token) headers['Authorization'] = `Bearer ${params.token}`;
+
+      const response = await fetch(url, { headers });
       const responseText = await response.text();
       
       if (!response.ok) {
@@ -1011,30 +1018,23 @@ export class ApiService {
   // ===== FAVORITES CONTROLLER =====
   
   /**
-   * POST /api/favorites/add - Add favorite mentor
+   * POST /api/favorites - Add mentor to favorites (returns 200)
    */
-  static async addFavoriteMentor(userId: string, mentorId: string): Promise<ApiResponse<any>> {
-    return this.makeRequest('/api/favorites/add', {
+  static async addFavorite(userId: string, mentorId: string): Promise<ApiResponse<any>> {
+    return this.makeRequest('/api/favorites', {
       method: 'POST',
       body: JSON.stringify({ userId, mentorId }),
     });
   }
 
   /**
-   * DELETE /api/favorites/remove - Remove favorite mentor
+   * DELETE /api/favorites - Remove mentor from favorites (returns 204)
    */
-  static async removeFavoriteMentor(userId: string, mentorId: string): Promise<ApiResponse<any>> {
-    return this.makeRequest('/api/favorites/remove', {
+  static async removeFavorite(userId: string, mentorId: string): Promise<ApiResponse<any>> {
+    return this.makeRequest('/api/favorites', {
       method: 'DELETE',
       body: JSON.stringify({ userId, mentorId }),
     });
-  }
-
-  /**
-   * GET /api/favorites/user/{userId} - Get user favorites
-   */
-  static async getUserFavorites(userId: string): Promise<ApiResponse<any[]>> {
-    return this.makeRequest<any[]>(`/api/favorites/user/${encodeURIComponent(userId)}`);
   }
 
   // ===== REVIEWS CONTROLLER =====
