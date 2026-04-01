@@ -16,6 +16,23 @@ export interface AuthUser {
 }
 
 export class AuthService {
+  private static mapUserResponse(data: any): any {
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      mobile: data.mobile,
+      country: data.country,
+      dateOfBirth: data.date_of_birth ?? data.dateOfBirth ?? null,
+      currentAddress: data.current_address ?? data.currentAddress ?? null,
+      pincode: data.pincode ?? null,
+      gender: data.gender ?? null,
+      userType: data.user_type ?? data.userType,
+      profileCompleted: data.profile_completed ?? data.is_profile_completed ?? data.isProfileCompleted,
+      jwtToken: data.jwt_token ?? data.jwtToken,
+    };
+  }
+
   // Google Sign-In using Expo AuthSession
   static async signInWithGoogle(): Promise<AuthUser> {
     try {
@@ -128,16 +145,18 @@ export class AuthService {
   // Register/Login with backend API
   static async registerOrLoginWithBackend(user: AuthUser, additionalData?: any): Promise<any> {
     try {
-      const requestBody = {
+      const requestBody: Record<string, any> = {
         name: user.name,
         email: user.email,
         mobile: additionalData?.mobile || '1234567890',
         country: additionalData?.country || 'India',
-        dateOfBirth: additionalData?.dateOfBirth || '',
         password: '', // Not needed for social auth
         token: user.token || '',
         method: user.provider,
       };
+      if (additionalData?.dateOfBirth) {
+        requestBody.date_of_birth = additionalData.dateOfBirth;
+      }
 
       const response = await fetch(`${AUTH_CONFIG.API.BASE_URL}/api/user/register`, {
         method: 'POST',
@@ -154,7 +173,7 @@ export class AuthService {
         throw new Error(data.message || 'Backend authentication failed');
       }
 
-      return data;
+      return this.mapUserResponse(data);
     } catch (error: any) {
       throw new Error(`Backend API error: ${error.message}`);
     }
@@ -282,17 +301,7 @@ export class AuthService {
       console.log('Login successful, returning data');
       console.log('=== LOGIN ATTEMPT END ===');
       
-      // Return data with snake_case to camelCase conversion
-      return {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        mobile: data.mobile,
-        country: data.country,
-        userType: data.user_type,
-        profileCompleted: data.is_profile_completed,
-        jwtToken: data.jwt_token,
-      };
+      return this.mapUserResponse(data);
     } catch (error: any) {
       console.error('=== LOGIN ERROR ===');
       console.error('Login error details:', error);
@@ -368,17 +377,7 @@ export class AuthService {
       console.log('Token signin successful');
       console.log('=== TOKEN SIGNIN ATTEMPT END ===');
       
-      // Return data with snake_case to camelCase conversion
-      return {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        mobile: data.mobile,
-        country: data.country,
-        userType: data.user_type,
-        profileCompleted: data.is_profile_completed,
-        jwtToken: data.jwt_token, // New refreshed token
-      };
+      return this.mapUserResponse(data);
     } catch (error: any) {
       console.error('=== TOKEN SIGNIN ERROR ===');
       console.error('Token signin error:', error);
@@ -404,7 +403,7 @@ export class AuthService {
         baseUrl: AUTH_CONFIG.API.BASE_URL,
       });
 
-      const requestBody = {
+      const requestBody: Record<string, any> = {
         name: userData.name,
         email: userData.email,
         mobile: userData.mobile || '9876543210',
@@ -412,6 +411,9 @@ export class AuthService {
         password: userData.password,
         method: 'password', // Use 'password' as per API doc
       };
+      if (userData.dateOfBirth) {
+        requestBody.date_of_birth = userData.dateOfBirth;
+      }
 
       console.log('Registration request body:', requestBody);
 
@@ -457,17 +459,7 @@ export class AuthService {
         }
       }
 
-      // Return data with snake_case to camelCase conversion
-      return {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        mobile: data.mobile,
-        country: data.country,
-        userType: data.user_type,
-        profileCompleted: data.is_profile_completed,
-        jwtToken: data.jwt_token,
-      };
+      return this.mapUserResponse(data);
     } catch (error: any) {
       console.error('Registration error details:', error);
       

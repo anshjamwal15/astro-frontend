@@ -223,6 +223,10 @@ export class ApiService {
     name?: string;
     mobile?: string;
     country?: string;
+    date_of_birth?: string;
+    current_address?: string;
+    pincode?: string;
+    gender?: string;
   }): Promise<ApiResponse<any>> {
     return this.makeRequest('/api/user/update', {
       method: 'PUT',

@@ -107,6 +107,7 @@ export default function SignUpScreen() {
         country: userData.country,
         userType: userData.userType || 'CUSTOMER',
         profileCompleted: userData.profileCompleted || false,
+        dateOfBirth: userData.dateOfBirth,
       });
 
       // Save JWT token

@@ -20,18 +20,19 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser } from '../../contexts/UserContext';
 import { ApiService } from '../../services/apiService';
+import { logger } from '@/utils/Logger';
 
 export default function ProfileTab() {
   const { user, updateUser, logout } = useUser();
   const [formData, setFormData] = useState({
     name: user?.name || '',
-    gender: 'Female',
+    gender: user?.gender || '',
     dateOfBirth: user?.dateOfBirth || '',
     timeOfBirth: '12:00 PM',
     placeOfBirth: 'New Delhi, Delhi, India',
-    currentAddress: '',
+    currentAddress: user?.currentAddress || '',
     cityStateCountry: '',
-    pincode: '',
+    pincode: user?.pincode || '',
   });
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -45,6 +46,7 @@ export default function ProfileTab() {
   // Load profile image from local storage
   useEffect(() => {
     loadProfileImage();
+    logger.error('This is My name and date of birth', { name: user?.name, dateOfBirth: user?.dateOfBirth });
   }, []);
 
   // Update form data when user data changes
@@ -54,6 +56,9 @@ export default function ProfileTab() {
         ...prev,
         name: user.name || '',
         dateOfBirth: user.dateOfBirth || '',
+        gender: user.gender || '',
+        currentAddress: user.currentAddress || '',
+        pincode: user.pincode || '',
         // Parse bio if it exists to populate address fields
         ...(user.bio && user.bio.includes(',') ? (() => {
           const bioParts = user.bio.split(',').map(part => part.trim());
@@ -207,19 +212,30 @@ export default function ProfileTab() {
       return;
     }
 
+    if (formData.dateOfBirth && !isValidDate(formData.dateOfBirth)) {
+      Alert.alert('Error', 'Please enter a valid date (YYYY-MM-DD).');
+      return;
+    }
+
     setIsUpdating(true);
     try {
       console.log('Updating user profile with data:', formData);
 
-      // Prepare the update data
-      const updateData = {
+      const currentAddressCombined = `${formData.currentAddress}${formData.cityStateCountry ? `, ${formData.cityStateCountry}` : ''}`
+        .trim()
+        .replace(/^,\s*|,\s*$/g, '');
+
+      // Prepare the update data (backend expects snake_case; send only fields you want to update)
+      const updateData: Parameters<typeof ApiService.updateUserProfile>[0] = {
         email: user.email,
         name: formData.name.trim(),
-        mobile: user.mobile,
-        country: user.country,
-        dateOfBirth: formData.dateOfBirth,
-        bio: `${formData.currentAddress}, ${formData.cityStateCountry}, ${formData.pincode}`.trim().replace(/^,\s*|,\s*$/g, ''), // Remove leading/trailing commas
       };
+      if (user.mobile) updateData.mobile = user.mobile;
+      if (user.country) updateData.country = user.country;
+      if (formData.dateOfBirth) updateData.date_of_birth = formData.dateOfBirth;
+      if (currentAddressCombined) updateData.current_address = currentAddressCombined;
+      if (formData.pincode) updateData.pincode = formData.pincode;
+      if (formData.gender) updateData.gender = formData.gender;
 
       // Update user profile via API
       const response = await ApiService.updateUserProfile(updateData);
@@ -227,12 +243,15 @@ export default function ProfileTab() {
       if (response.success) {
         // Map the API response to match frontend User interface
         const updatedUserData = {
-          name: response.data.name,
-          dateOfBirth: response.data.dateOfBirth,
-          bio: response.data.bio,
-          zodiacSign: response.data.zodiacSign,
-          profilePicture: response.data.profilePicture,
-          profileCompleted: response.data.isProfileCompleted, // Map backend field name
+          name: response.data?.name,
+          mobile: response.data?.mobile,
+          country: response.data?.country,
+          dateOfBirth: response.data?.date_of_birth ?? response.data?.dateOfBirth ?? null,
+          currentAddress: response.data?.current_address ?? response.data?.currentAddress ?? null,
+          pincode: response.data?.pincode ?? null,
+          gender: response.data?.gender ?? null,
+          userType: response.data?.user_type ?? response.data?.userType,
+          profileCompleted: response.data?.profile_completed ?? response.data?.is_profile_completed ?? response.data?.isProfileCompleted,
         };
 
         // Update user context with new data
@@ -340,6 +359,36 @@ export default function ProfileTab() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Auto-format date of birth as user types (YYYY-MM-DD)
+  const handleDOBChange = (text: string) => {
+    const numericOnly = text.replace(/\D/g, '');
+
+    let formatted = numericOnly;
+    if (numericOnly.length >= 5) {
+      formatted = `${numericOnly.slice(0, 4)}-${numericOnly.slice(4, 6)}`;
+    }
+    if (numericOnly.length >= 7) {
+      formatted = `${numericOnly.slice(0, 4)}-${numericOnly.slice(4, 6)}-${numericOnly.slice(6, 8)}`;
+    }
+
+    if (formatted.length <= 10) {
+      updateFormData('dateOfBirth', formatted);
+    }
+  };
+
+  const isValidDate = (dateString: string) => {
+    if (!dateString) return true;
+
+    const regex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!regex.test(dateString)) return false;
+
+    const date = new Date(dateString);
+    const now = new Date();
+    const minDate = new Date('1900-01-01');
+
+    return date >= minDate && date <= now && !isNaN(date.getTime());
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0052CC" />
@@ -431,19 +480,15 @@ export default function ProfileTab() {
           {/* Date of Birth */}
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Date of Birth</Text>
-            <Text style={styles.fieldValue}>{formData.dateOfBirth}</Text>
-          </View>
-
-          {/* Time of Birth */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Time of Birth</Text>
-            <Text style={styles.fieldValue}>{formData.timeOfBirth}</Text>
-          </View>
-
-          {/* Place of Birth */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Place of Birth</Text>
-            <Text style={styles.fieldValue}>{formData.placeOfBirth}</Text>
+            <TextInput
+              style={styles.textInput}
+              value={formData.dateOfBirth}
+              onChangeText={handleDOBChange}
+              placeholder="YYYY-MM-DD (e.g., 1995-02-10)"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+              maxLength={10}
+            />
           </View>
 
           {/* Current Address */}

@@ -8,6 +8,9 @@ export interface User {
   mobile?: string;
   country?: string;
   dateOfBirth?: string;
+  currentAddress?: string | null;
+  pincode?: string | null;
+  gender?: string | null;
   userType?: string;
   profileCompleted?: boolean;
   profilePicture?: string; // URL or base64 string
