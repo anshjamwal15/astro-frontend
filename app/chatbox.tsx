@@ -17,6 +17,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../contexts/UserContext';
 import { ChatService, ChatMessage } from '../services/chatService';
+import { BillingTimerService } from '../services/BillingTimerService';
+import { logger } from '@/utils/Logger';
 
 interface Message {
   id: string;
@@ -54,13 +56,15 @@ export default function ChatBoxScreen() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [sessionActive] = useState(false);
-  const [currentBalance] = useState(0);
-  const [minutesPassed] = useState(0);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [currentBalance, setCurrentBalance] = useState(0);
+  const [minutesPassed, setMinutesPassed] = useState(0);
+  const [chatDuration, setChatDuration] = useState(0);
   const [showLowBalanceWarning, setShowLowBalanceWarning] = useState(false);
-  const [estimatedMinutes] = useState(0);
+  const [estimatedMinutes, setEstimatedMinutes] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const billingSessionId = useRef<string | null>(null);
 
   useEffect(() => {
     if (activeUserId && (roomId || astrologerId)) {
@@ -68,6 +72,9 @@ export default function ChatBoxScreen() {
     }
     return () => {
       cleanup();
+      if (billingSessionId.current) {
+        BillingTimerService.stopTimer(billingSessionId.current);
+      }
     };
   }, [activeUserId, roomId, astrologerId]);
 
@@ -76,6 +83,14 @@ export default function ChatBoxScreen() {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, [messages]);
+
+  useEffect(() => {
+    if (!sessionActive) return;
+    const interval = setInterval(() => {
+      setChatDuration((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [sessionActive]);
 
   const cleanup = () => {
     unsubscribeRef.current?.();
@@ -149,6 +164,12 @@ export default function ChatBoxScreen() {
         },
         (err) => console.error('Chat listener error:', err)
       );
+
+      // Start billing timer if rate is provided and valid
+      const rate = parseFloat(ratePerMinute as string);
+      if (ratePerMinute && !isNaN(rate) && rate > 0 && activeUserId && astrologerId) {
+        startBillingTimer();
+      }
     } catch (error: any) {
       Alert.alert('Error', error.message ?? 'Failed to load chat.');
     } finally {
@@ -167,8 +188,89 @@ export default function ChatBoxScreen() {
     }
   };
 
-  const endChatSession = async (_reason: 'USER_CANCELLED' | 'INSUFFICIENT_BALANCE' | 'NORMAL_END' = 'NORMAL_END') => {
-    // TODO: implement
+  const startBillingTimer = () => {
+    if (!activeUserId || !astrologerId || !ratePerMinute) return;
+
+    const sessionId = `chat_${activeUserId}_${astrologerId}_${Date.now()}`;
+    billingSessionId.current = sessionId;
+    const rate = parseFloat(ratePerMinute as string);
+
+    console.log(`Starting chat billing timer: ₹${rate}/min`);
+
+    BillingTimerService.startTimer({
+      sessionId,
+      userId: activeUserId,
+      mentorId: astrologerId as string,
+      sessionType: 'CHAT',
+      ratePerMinute: rate,
+      onMinuteComplete: (minutes, amountDeducted, remainingBalance) => {
+        console.log(`Chat minute ${minutes} completed. Deducted: ₹${amountDeducted}`);
+        setMinutesPassed(minutes);
+        setCurrentBalance(remainingBalance);
+
+        // Show low balance warning if less than 3 minutes remain
+        const minsLeft = Math.floor(remainingBalance / rate);
+        if (minsLeft <= 3) {
+          setEstimatedMinutes(minsLeft);
+          setShowLowBalanceWarning(true);
+        }
+
+        BillingTimerService.showContinueDialog(
+          minutes,
+          amountDeducted,
+          remainingBalance,
+          () => {
+            console.log('User chose to continue chat');
+          },
+          () => {
+            console.log('User chose to end chat');
+            endChatSession('USER_CANCELLED');
+          }
+        );
+      },
+      onInsufficientBalance: (minutes, totalCost) => {
+        console.log(`Insufficient balance after ${minutes} minutes of chat`);
+        setMinutesPassed(minutes);
+
+        BillingTimerService.showInsufficientBalanceDialog(
+          minutes,
+          totalCost,
+          () => {
+            Alert.alert('Add Money', 'Please use the wallet section to add money.');
+            endChatSession('INSUFFICIENT_BALANCE');
+          },
+          () => {
+            endChatSession('INSUFFICIENT_BALANCE');
+          }
+        );
+      },
+      onSessionEnd: (summary) => {
+        console.log('Chat session ended:', summary);
+      },
+    });
+
+    setSessionActive(true);
+  };
+
+  const endChatSession = async (reason: 'USER_CANCELLED' | 'INSUFFICIENT_BALANCE' | 'NORMAL_END' = 'NORMAL_END') => {
+    const sessionId = billingSessionId.current;
+    if (!sessionId) {
+      router.back();
+      return;
+    }
+
+    const summary = await BillingTimerService.endSession(sessionId, reason);
+    billingSessionId.current = null;
+    setSessionActive(false);
+
+    const message =
+      reason === 'INSUFFICIENT_BALANCE'
+        ? `Chat ended due to insufficient balance.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}`
+        : reason === 'USER_CANCELLED'
+        ? `Chat cancelled.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}\nRemaining Balance: ₹${summary.remainingBalance.toFixed(2)}`
+        : `Chat ended.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}\nRemaining Balance: ₹${summary.remainingBalance.toFixed(2)}`;
+
+    Alert.alert('Chat Summary', message, [{ text: 'OK', onPress: () => router.back() }]);
   };
 
   const handleCallPress = async () => {
@@ -183,6 +285,12 @@ export default function ChatBoxScreen() {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (isLoading) {
@@ -207,7 +315,20 @@ export default function ChatBoxScreen() {
         <View style={styles.headerContent}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (sessionActive) {
+                Alert.alert(
+                  'End Chat',
+                  'Are you sure you want to end this chat session?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'End Chat', style: 'destructive', onPress: () => endChatSession('USER_CANCELLED') },
+                  ]
+                );
+              } else {
+                router.back();
+              }
+            }}
           >
             <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
           </TouchableOpacity>
@@ -231,9 +352,11 @@ export default function ChatBoxScreen() {
                 {/* {isOnline === 'true' ? 'Online' : 'Offline'} */} {/* TODO: add online status from server side first */}
               </Text>
               {sessionActive && (
-                <Text style={styles.billingInfo}>
-                  ₹{ratePerMinute}/min • {minutesPassed} min • Balance: ₹{currentBalance.toFixed(2)}
-                </Text>
+                <View style={styles.timerPill}>
+                  <View style={styles.timerDot} />
+                  <Text style={styles.timerText}>{formatDuration(chatDuration)}</Text>
+                  <Text style={styles.timerBilling}> • ₹{ratePerMinute}/min • ₹{currentBalance.toFixed(0)} left</Text>
+                </View>
               )}
             </View>
           </View>
@@ -440,6 +563,33 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '500',
     marginTop: 2,
+  },
+  timerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  timerDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#ff3b30',
+    marginRight: 5,
+  },
+  timerText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  timerBilling: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.85)',
   },
   endChatButton: {
     backgroundColor: 'rgba(255, 68, 68, 0.8)',

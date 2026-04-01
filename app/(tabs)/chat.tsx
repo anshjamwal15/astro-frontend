@@ -70,6 +70,7 @@ export default function ChatScreen() {
         astrologerName: room.name,
         astrologerImage: '',
         isOnline: 'false',
+        ratePerMinute: '',
       },
     });
   };

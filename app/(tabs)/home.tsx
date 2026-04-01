@@ -194,6 +194,7 @@ export default function HomeScreen() {
           astrologerName: astrologer.name,
           astrologerImage: astrologer.image ?? '',
           isOnline: (astrologer.isOnline ?? false).toString(),
+          ratePerMinute: (astrologer.rate || astrologer.price || 17).toString(),
         },
       });
     } catch (error: any) {
