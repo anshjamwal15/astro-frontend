@@ -1,3 +1,4 @@
+import { logger } from '@/utils/Logger';
 import { AUTH_CONFIG } from '../config/auth';
 import { ensureUUID } from '../utils/uuid';
 import { WalletApiService } from './WalletApiService';
@@ -82,224 +83,46 @@ export class WalletService {
   static async deductMoney(userId: string, amount: number, sessionType: 'AUDIO_CALL' | 'VIDEO_CALL' | 'CHAT'): Promise<WalletBalance> {
     try {
       const uuidUserId = ensureUUID(userId);
-      
+      const jwtToken = await this.getJwtToken();
+
       console.log('💳 WalletService.deductMoney called with:', {
         originalUserId: userId,
         convertedUserId: uuidUserId,
-        amount: amount,
-        sessionType: sessionType,
+        amount,
+        sessionType,
+      });
+      const response = await fetch(`${this.baseUrl}/api/wallet/deduct-money`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/hal+json',
+          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
+          'X-API-Key': AUTH_CONFIG.API.API_KEY,
+          'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
+        },
+        body: JSON.stringify({
+          userId: uuidUserId,
+          amount,
+          reason: sessionType,
+        }),
       });
 
-      const result = await WalletApiService.deductMoney(amount, sessionType, uuidUserId);
-      
-      console.log('✅ WalletService.deductMoney result:', result);
-      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ WalletService.deductMoney result:', data);
+
       return {
-        userId: result.userId,
-        balance: result.balance,
-        currency: 'INR'
+        userId: data.userId,
+        balance: data.balance,
+        currency: 'INR',
       };
     } catch (error: any) {
-      console.error('❌ WalletService.deductMoney error:', error);
-      console.error('Error message:', error.message);
+      console.error('❌ WalletService.deductMoney error:', error.message);
       throw new Error(`Failed to deduct money: ${error.message}`);
-    }
-  }
-
-  // Start billable session (webhook) - Optional, for backend billing tracking
-  static async startSession(
-    sessionId: string, 
-    userId: string, 
-    mentorId: string, 
-    sessionType: 'AUDIO_CALL' | 'VIDEO_CALL' | 'CHAT'
-  ): Promise<SessionStatus> {
-    try {
-      const jwtToken = await this.getJwtToken();
-      
-      const response = await fetch(`${this.baseUrl}/api/billing/session/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
-          'X-API-Key': AUTH_CONFIG.API.API_KEY,
-          'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
-        },
-        body: JSON.stringify({
-          session_id: sessionId,
-          user_id: ensureUUID(userId),
-          mentor_id: ensureUUID(mentorId),
-          session_type: sessionType
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.warn('Backend session start failed:', errorData.message || response.status);
-        // Return a default status instead of throwing
-        return {
-          sessionId,
-          status: 'STARTED',
-          currentBalance: 0,
-          ratePerMinute: 0,
-          estimatedMinutes: 0,
-          message: 'Session started (backend tracking unavailable)'
-        };
-      }
-
-      const data = await response.json();
-      return {
-        sessionId: data.session_id || sessionId,
-        status: data.status,
-        currentBalance: parseFloat(data.current_balance || 0),
-        ratePerMinute: parseFloat(data.rate_per_minute || 0),
-        estimatedMinutes: data.estimated_minutes || 0,
-        message: data.message || 'Session started'
-      };
-    } catch (error: any) {
-      console.warn('Error starting backend session:', error.message);
-      // Return a default status instead of throwing
-      return {
-        sessionId,
-        status: 'STARTED',
-        currentBalance: 0,
-        ratePerMinute: 0,
-        estimatedMinutes: 0,
-        message: 'Session started (backend tracking unavailable)'
-      };
-    }
-  }
-
-  // End billable session (webhook) - Optional, for backend billing tracking
-  static async endSession(sessionId: string, reason: string = 'NORMAL_END'): Promise<SessionStatus> {
-    try {
-      const jwtToken = await this.getJwtToken();
-      
-      const response = await fetch(`${this.baseUrl}/api/billing/session/end`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
-          'X-API-Key': AUTH_CONFIG.API.API_KEY,
-          'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
-        },
-        body: JSON.stringify({
-          session_id: sessionId,
-          reason: reason
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.warn('Backend session end failed:', errorData.message || response.status);
-        // Return a default status instead of throwing
-        return {
-          sessionId,
-          status: 'ENDED',
-          currentBalance: 0,
-          ratePerMinute: 0,
-          estimatedMinutes: 0,
-          message: 'Session ended (backend tracking unavailable)'
-        };
-      }
-
-      const data = await response.json();
-      return {
-        sessionId: data.session_id || sessionId,
-        status: data.status,
-        currentBalance: parseFloat(data.current_balance || 0),
-        ratePerMinute: parseFloat(data.rate_per_minute || 0),
-        estimatedMinutes: data.estimated_minutes || 0,
-        totalCost: data.total_cost ? parseFloat(data.total_cost) : undefined,
-        durationMinutes: data.duration_minutes,
-        message: data.message || 'Session ended'
-      };
-    } catch (error: any) {
-      console.warn('Error ending backend session:', error.message);
-      // Return a default status instead of throwing
-      return {
-        sessionId,
-        status: 'ENDED',
-        currentBalance: 0,
-        ratePerMinute: 0,
-        estimatedMinutes: 0,
-        message: 'Session ended (backend tracking unavailable)'
-      };
-    }
-  }
-
-  // Check session status (webhook) - Optional, for backend billing tracking
-  static async checkSessionStatus(sessionId: string): Promise<SessionStatus> {
-    try {
-      const jwtToken = await this.getJwtToken();
-      
-      const response = await fetch(`${this.baseUrl}/api/billing/session/${sessionId}/status`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...(jwtToken && { 'Authorization': `Bearer ${jwtToken}` }),
-          'X-API-Key': AUTH_CONFIG.API.API_KEY,
-          'X-Client-Secret': AUTH_CONFIG.API.CLIENT_SECRET,
-        },
-      });
-
-      if (!response.ok) {
-        console.warn('Backend session status check failed:', response.status);
-        // Return a default status instead of throwing
-        return {
-          sessionId,
-          status: 'NOT_FOUND',
-          currentBalance: 0,
-          ratePerMinute: 0,
-          estimatedMinutes: 0,
-          message: 'Session status unavailable'
-        };
-      }
-
-      const data = await response.json();
-      return {
-        sessionId: data.session_id || sessionId,
-        status: data.status,
-        currentBalance: parseFloat(data.current_balance || 0),
-        ratePerMinute: parseFloat(data.rate_per_minute || 0),
-        estimatedMinutes: data.estimated_minutes || 0,
-        message: data.message || 'Status checked'
-      };
-    } catch (error: any) {
-      console.warn('Error checking backend session status:', error.message);
-      // Return a default status instead of throwing
-      return {
-        sessionId,
-        status: 'NOT_FOUND',
-        currentBalance: 0,
-        ratePerMinute: 0,
-        estimatedMinutes: 0,
-        message: 'Session status unavailable'
-      };
-    }
-  }
-
-  // Get billing rates
-  static async getBillingRates(): Promise<BillingRates> {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/billing/rates`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to get billing rates: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error: any) {
-      console.error('Error getting billing rates:', error);
-      throw error;
     }
   }
 

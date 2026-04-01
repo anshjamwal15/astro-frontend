@@ -157,7 +157,7 @@ export class BillingTimerService {
         console.log(`🔄 Deducting total amount ₹${totalDeducted} from wallet (SINGLE API CALL)`);
         const updatedBalance = await WalletService.deductMoney(
           config.userId,
-          currentBalance - totalDeducted,
+          totalDeducted,
           config.sessionType
         );
         remainingBalance = updatedBalance.balance;
@@ -188,7 +188,7 @@ export class BillingTimerService {
 
     // End the billing session on the backend (optional - for tracking purposes)
     try {
-      await WalletService.endSession(sessionId, endReason);
+      // await WalletService.endSession(sessionId, endReason);
       console.log(`✅ Backend session ${sessionId} ended successfully`);
     } catch (error) {
       console.warn('Backend session end failed (non-critical):', error);
