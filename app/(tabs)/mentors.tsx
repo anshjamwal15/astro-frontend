@@ -58,6 +58,7 @@ export default function MentorsScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  const [imageLoading, setImageLoading] = useState<Set<string>>(new Set());
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -176,9 +177,7 @@ export default function MentorsScreen() {
             originalPrice: mentor.originalPrice || 21,
             isOnline: Math.random() > 0.3,
             hasSpecialOffer: Math.random() > 0.5,
-            photo:
-              mentor.photo ||
-              `https://via.placeholder.com/60x60/4A90E2/FFFFFF?text=${mentor.name.charAt(0)}`,
+            photo: mentor.photo || undefined,
           }));
           setMentors(prev => (append ? [...prev, ...mapped] : mapped));
           setTotal(response.pagination?.total ?? mapped.length);
@@ -394,18 +393,29 @@ export default function MentorsScreen() {
                 <View key={mentor.id} style={styles.astrologerCard}>
                   <View style={styles.astrologerInfo}>
                     <View style={styles.astrologerImageContainer}>
-                      {imageErrors.has(mentor.id) ? (
-                        <View style={[styles.astrologerImage, styles.fallbackIconContainer]}>
+                      {imageErrors.has(mentor.id) || !mentor.photo ? (
+                        <View style={styles.fallbackIconContainer}>
                           <Ionicons name="person" size={36} color="#999" />
                         </View>
                       ) : (
-                        <Image
-                          source={{ uri: mentor.photo }}
-                          style={styles.astrologerImage}
-                          onError={() => setImageErrors(prev => new Set(prev).add(mentor.id))}
-                        />
+                        <>
+                          <Image
+                            source={{ uri: mentor.photo }}
+                            style={styles.astrologerImage}
+                            onLoadStart={() => setImageLoading(prev => new Set(prev).add(mentor.id))}
+                            onLoadEnd={() => setImageLoading(prev => { const next = new Set(prev); next.delete(mentor.id); return next; })}
+                            onError={() => {
+                              setImageErrors(prev => new Set(prev).add(mentor.id));
+                              setImageLoading(prev => { const next = new Set(prev); next.delete(mentor.id); return next; });
+                            }}
+                          />
+                          {imageLoading.has(mentor.id) && (
+                            <View style={styles.imageLoaderOverlay}>
+                              <ActivityIndicator size="small" color="#0052CC" />
+                            </View>
+                          )}
+                        </>
                       )}
-
                     </View>
 
                     <View style={styles.astrologerDetails}>
@@ -649,7 +659,8 @@ const styles = StyleSheet.create({
   astrologerInfo: { flex: 1, flexDirection: 'row' },
   astrologerImageContainer: { position: 'relative', marginRight: 15 },
   astrologerImage: { width: 60, height: 60, borderRadius: 30 },
-  fallbackIconContainer: { backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
+  fallbackIconContainer: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
+  imageLoaderOverlay: { position: 'absolute', top: 0, left: 0, width: 60, height: 60, borderRadius: 30, backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
 
   astrologerDetails: { flex: 1 },
   astrologerName: { fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 4 },

@@ -86,13 +86,13 @@ export default function VideoRoomScreen() {
           />
         </View>
 
-        <TouchableOpacity 
+        {/* <TouchableOpacity 
           style={styles.createButton}
           onPress={handleCreateRoom}
         >
           <Ionicons name="add-circle" size={24} color="#FFFFFF" />
           <Text style={styles.createButtonText}>Create Room</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
 
         <TouchableOpacity 
           style={styles.joinButton}

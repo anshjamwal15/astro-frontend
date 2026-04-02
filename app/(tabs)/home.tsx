@@ -351,23 +351,10 @@ export default function HomeScreen() {
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity 
             style={styles.actionButton}
+            onPress={() => router.push('/become-mentor' as any)}
           >
-            <Ionicons name="call" size={24} color="#333" />
-            <Text style={styles.actionButtonText}>Call an Mentor</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => {
-              if (astrologers.length > 0) {
-                handleConsultation(astrologers[0]);
-              } else {
-                router.push('/(tabs)/mentors');
-              }
-            }}
-          >
-            <Ionicons name="chatbubbles" size={24} color="#333" />
-            <Text style={styles.actionButtonText}>Chat with Expert</Text>
+            <Ionicons name="people-circle-outline" size={28} color="#333" />
+            <Text style={styles.actionButtonText}>Become Mentor</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
