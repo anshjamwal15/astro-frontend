@@ -30,6 +30,7 @@ export class AuthService {
       userType: data.user_type ?? data.userType,
       profileCompleted: data.profile_completed ?? data.is_profile_completed ?? data.isProfileCompleted,
       jwtToken: data.jwt_token ?? data.jwtToken,
+      isMentor: data.isMentor ?? false,
     };
   }
 

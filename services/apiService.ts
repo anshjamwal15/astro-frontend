@@ -301,6 +301,8 @@ export class ApiService {
     totalRatings?: number;
     nationality?: string;
     category?: string;
+    sortBy?: string;
+    sortDir?: string;
     token?: string;
   }): Promise<ApiResponse<MentorData[]> & { pagination?: { page: number; size: number; total: number } }> {
     try {
@@ -311,6 +313,8 @@ export class ApiService {
       if (params?.totalRatings != null) query.set('totalRatings', String(params.totalRatings));
       if (params?.nationality) query.set('nationality', params.nationality);
       if (params?.category) query.set('category', params.category);
+      if (params?.sortBy) query.set('sortBy', params.sortBy);
+      if (params?.sortDir) query.set('sortDir', params.sortDir);
 
       const url = `${this.baseUrl}/api/mentor/list${query.toString() ? '?' + query.toString() : ''}`;
       console.log('Fetching mentors from:', url);

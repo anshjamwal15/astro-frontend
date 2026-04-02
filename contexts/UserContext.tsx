@@ -16,6 +16,7 @@ export interface User {
   profilePicture?: string; // URL or base64 string
   bio?: string;
   zodiacSign?: string;
+  isMentor?: boolean;
 }
 
 interface UserContextType {

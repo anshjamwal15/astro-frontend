@@ -71,6 +71,7 @@ export default function SignInScreen() {
         country: userData.country,
         userType: userData.userType || 'CUSTOMER',
         profileCompleted: userData.profileCompleted || false,
+        isMentor: userData.isMentor ?? false,
       });
 
       // Save JWT token

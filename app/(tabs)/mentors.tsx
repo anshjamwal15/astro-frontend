@@ -45,6 +45,8 @@ interface FilterState {
   totalExp: string;
   totalRatings: string;
   nationality: string;
+  sortBy: string;
+  sortDir: string;
 }
 
 const PAGE_SIZE = 10;
@@ -65,12 +67,16 @@ export default function MentorsScreen() {
     totalExp: '',
     totalRatings: '',
     nationality: '',
+    sortBy: '',
+    sortDir: '',
   });
   const [appliedFilters, setAppliedFilters] = useState<FilterState>({
     category: '',
     totalExp: '',
     totalRatings: '',
     nationality: '',
+    sortBy: '',
+    sortDir: '',
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,7 +126,8 @@ export default function MentorsScreen() {
   const hasActiveFilters =
     appliedFilters.totalExp !== '' ||
     appliedFilters.totalRatings !== '' ||
-    appliedFilters.nationality !== '';
+    appliedFilters.nationality !== '' ||
+    appliedFilters.sortBy !== '';
 
   const buildParams = useCallback(
     (pageNum: number, filters: FilterState, category: string) => {
@@ -134,6 +141,8 @@ export default function MentorsScreen() {
       if (filters.totalExp) params.totalExp = Number(filters.totalExp);
       if (filters.totalRatings) params.totalRatings = Number(filters.totalRatings);
       if (filters.nationality) params.nationality = filters.nationality;
+      if (filters.sortBy) params.sortBy = filters.sortBy;
+      if (filters.sortDir) params.sortDir = filters.sortDir;
       return params;
     },
     [jwtToken]
@@ -220,7 +229,7 @@ export default function MentorsScreen() {
   };
 
   const handleClearFilters = () => {
-    const empty: FilterState = { category: '', totalExp: '', totalRatings: '', nationality: '' };
+    const empty: FilterState = { category: '', totalExp: '', totalRatings: '', nationality: '', sortBy: '', sortDir: '' };
     setPendingFilters(empty);
     setAppliedFilters(empty);
     setFilterModalVisible(false);
@@ -493,6 +502,34 @@ export default function MentorsScreen() {
             </View>
 
             <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+              <Text style={styles.inputLabel}>Sort By</Text>
+              {[
+                { label: 'Rate: Low to High', sortBy: 'rate', sortDir: 'asc' },
+                { label: 'Rate: High to Low', sortBy: 'rate', sortDir: 'desc' },
+                { label: 'Rating: Low to High', sortBy: 'rating', sortDir: 'asc' },
+                { label: 'Rating: High to Low', sortBy: 'rating', sortDir: 'desc' },
+              ].map(opt => {
+                const isSelected = pendingFilters.sortBy === opt.sortBy && pendingFilters.sortDir === opt.sortDir;
+                return (
+                  <TouchableOpacity
+                    key={`${opt.sortBy}-${opt.sortDir}`}
+                    style={[styles.sortOption, isSelected && styles.sortOptionActive]}
+                    onPress={() =>
+                      setPendingFilters(p => ({
+                        ...p,
+                        sortBy: isSelected ? '' : opt.sortBy,
+                        sortDir: isSelected ? '' : opt.sortDir,
+                      }))
+                    }
+                  >
+                    <Text style={[styles.sortOptionText, isSelected && styles.sortOptionTextActive]}>
+                      {opt.label}
+                    </Text>
+                    {isSelected && <Ionicons name="checkmark" size={16} color="#0052CC" />}
+                  </TouchableOpacity>
+                );
+              })}
+
               <Text style={styles.inputLabel}>Category</Text>
               <TextInput
                 style={styles.input}
@@ -707,4 +744,22 @@ const styles = StyleSheet.create({
   clearButtonText: { fontSize: 15, fontWeight: '600', color: '#666' },
   applyButton: { flex: 2, paddingVertical: 14, borderRadius: 12, backgroundColor: '#0052CC', alignItems: 'center' },
   applyButtonText: { fontSize: 15, fontWeight: '600', color: '#FFF' },
+  sortOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#DDD',
+    backgroundColor: '#FAFAFA',
+    marginBottom: 8,
+  },
+  sortOptionActive: {
+    borderColor: '#0052CC',
+    backgroundColor: '#EEF4FF',
+  },
+  sortOptionText: { fontSize: 14, color: '#555' },
+  sortOptionTextActive: { color: '#0052CC', fontWeight: '600' },
 });

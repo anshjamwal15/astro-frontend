@@ -46,7 +46,6 @@ export default function ProfileTab() {
   // Load profile image from local storage
   useEffect(() => {
     loadProfileImage();
-    logger.error('This is My name and date of birth', { name: user?.name, dateOfBirth: user?.dateOfBirth });
   }, []);
 
   // Update form data when user data changes
