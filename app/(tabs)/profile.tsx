@@ -31,7 +31,7 @@ export default function ProfileTab() {
     timeOfBirth: '12:00 PM',
     placeOfBirth: 'New Delhi, Delhi, India',
     currentAddress: user?.currentAddress || '',
-    cityStateCountry: '',
+    country: user?.country || '',
     pincode: user?.pincode || '',
   });
   const [isDeleting, setIsDeleting] = useState(false);
@@ -57,16 +57,8 @@ export default function ProfileTab() {
         dateOfBirth: user.dateOfBirth || '',
         gender: user.gender || '',
         currentAddress: user.currentAddress || '',
+        country: user.country || '',
         pincode: user.pincode || '',
-        // Parse bio if it exists to populate address fields
-        ...(user.bio && user.bio.includes(',') ? (() => {
-          const bioParts = user.bio.split(',').map(part => part.trim());
-          return {
-            currentAddress: bioParts[0] || '',
-            cityStateCountry: bioParts[1] || '',
-            pincode: bioParts[2] || '',
-          };
-        })() : {}),
       }));
     }
   }, [user]);
@@ -220,19 +212,14 @@ export default function ProfileTab() {
     try {
       console.log('Updating user profile with data:', formData);
 
-      const currentAddressCombined = `${formData.currentAddress}${formData.cityStateCountry ? `, ${formData.cityStateCountry}` : ''}`
-        .trim()
-        .replace(/^,\s*|,\s*$/g, '');
-
-      // Prepare the update data (backend expects snake_case; send only fields you want to update)
       const updateData: Parameters<typeof ApiService.updateUserProfile>[0] = {
         email: user.email,
         name: formData.name.trim(),
       };
       if (user.mobile) updateData.mobile = user.mobile;
-      if (user.country) updateData.country = user.country;
+      if (formData.country) updateData.country = formData.country;
       if (formData.dateOfBirth) updateData.date_of_birth = formData.dateOfBirth;
-      if (currentAddressCombined) updateData.current_address = currentAddressCombined;
+      if (formData.currentAddress) updateData.current_address = formData.currentAddress;
       if (formData.pincode) updateData.pincode = formData.pincode;
       if (formData.gender) updateData.gender = formData.gender;
 
@@ -434,59 +421,69 @@ export default function ProfileTab() {
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Name*</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, !!user?.name && styles.textInputLocked]}
               value={formData.name}
               onChangeText={(text) => updateFormData('name', text)}
               placeholder="Enter your name"
               placeholderTextColor="#999"
+              editable={!user?.name}
             />
           </View>
 
           {/* Gender */}
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Gender</Text>
-            <View style={styles.genderContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.genderOption,
-                  formData.gender === 'Male' && styles.genderSelected
-                ]}
-                onPress={() => updateFormData('gender', 'Male')}
-              >
-                <View style={[
-                  styles.radioButton,
-                  formData.gender === 'Male' && styles.radioSelected
-                ]} />
-                <Text style={styles.genderText}>Male</Text>
-              </TouchableOpacity>
+            {user?.gender ? (
+              <TextInput
+                style={[styles.textInput, styles.textInputLocked]}
+                value={formData.gender}
+                editable={false}
+              />
+            ) : (
+              <View style={styles.genderContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.genderOption,
+                    formData.gender === 'Male' && styles.genderSelected
+                  ]}
+                  onPress={() => updateFormData('gender', 'Male')}
+                >
+                  <View style={[
+                    styles.radioButton,
+                    formData.gender === 'Male' && styles.radioSelected
+                  ]} />
+                  <Text style={styles.genderText}>Male</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.genderOption,
-                  formData.gender === 'Female' && styles.genderSelected
-                ]}
-                onPress={() => updateFormData('gender', 'Female')}
-              >
-                <View style={[
-                  styles.radioButton,
-                  formData.gender === 'Female' && styles.radioSelected
-                ]} />
-                <Text style={styles.genderText}>Female</Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={[
+                    styles.genderOption,
+                    formData.gender === 'Female' && styles.genderSelected
+                  ]}
+                  onPress={() => updateFormData('gender', 'Female')}
+                >
+                  <View style={[
+                    styles.radioButton,
+                    formData.gender === 'Female' && styles.radioSelected
+                  ]} />
+                  <Text style={styles.genderText}>Female</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* Date of Birth */}
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Date of Birth</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, !!user?.dateOfBirth && styles.textInputLocked]}
               value={formData.dateOfBirth}
               onChangeText={handleDOBChange}
               placeholder="YYYY-MM-DD (e.g., 1995-02-10)"
               placeholderTextColor="#999"
               keyboardType="numeric"
               maxLength={10}
+              editable={!user?.dateOfBirth}
             />
           </View>
 
@@ -494,24 +491,26 @@ export default function ProfileTab() {
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Current Address</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, !!user?.currentAddress && styles.textInputLocked]}
               value={formData.currentAddress}
               onChangeText={(text) => updateFormData('currentAddress', text)}
               placeholder="Enter Flat, House no, Building, Apartment"
               placeholderTextColor="#999"
               multiline
+              editable={!user?.currentAddress}
             />
           </View>
 
-          {/* City, State, Country */}
+          {/* Country */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>City, State, Country</Text>
+            <Text style={styles.fieldLabel}>Country</Text>
             <TextInput
-              style={styles.textInput}
-              value={formData.cityStateCountry}
-              onChangeText={(text) => updateFormData('cityStateCountry', text)}
-              placeholder="Enter Town/City, State, Country"
+              style={[styles.textInput, !!user?.country && styles.textInputLocked]}
+              value={formData.country}
+              onChangeText={(text) => updateFormData('country', text)}
+              placeholder="Enter Country"
               placeholderTextColor="#999"
+              editable={!user?.country}
             />
           </View>
 
@@ -519,12 +518,13 @@ export default function ProfileTab() {
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Pincode</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, !!user?.pincode && styles.textInputLocked]}
               value={formData.pincode}
               onChangeText={(text) => updateFormData('pincode', text)}
               placeholder="Enter Pincode"
               placeholderTextColor="#999"
               keyboardType="numeric"
+              editable={!user?.pincode}
             />
           </View>
 
@@ -716,6 +716,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
     color: '#333',
+  },
+  textInputLocked: {
+    color: '#999',
+    backgroundColor: 'transparent',
   },
   fieldValue: {
     fontSize: 16,

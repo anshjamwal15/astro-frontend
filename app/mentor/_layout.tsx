@@ -6,6 +6,7 @@ export default function MentorLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="broadcast" />
       <Stack.Screen name="chat-analytics" />
+      <Stack.Screen name="pending-status" />
     </Stack>
   );
 }

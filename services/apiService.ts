@@ -272,6 +272,67 @@ export class ApiService {
   }
 
   /**
+   * POST /api/mentor/register - Full mentor registration with profile fields
+   */
+  static async registerMentorFull(mentorData: {
+    nationality: string;
+    photo?: string;
+    city: string;
+    state: string;
+    pincode: number;
+    experience: number;
+    mainLanguage: string;
+    qualification: string;
+    about: string;
+    mainIncome: string;
+    weeklyHours: number;
+    rate: number;
+    twitter?: string;
+    linkedin?: string;
+    youtube?: string;
+    facebook?: string;
+    categories: string[];
+  }): Promise<ApiResponse<any>> {
+    return this.makeRequest('/api/mentor/register', {
+      method: 'POST',
+      body: JSON.stringify(mentorData),
+    });
+  }
+
+  /**
+   * POST /api/mentor/apply - Submit mentor application
+   */
+  static async applyAsMentor(mentorData: {
+    nationality: string;
+    photo?: string;
+    city: string;
+    state: string;
+    pincode: number;
+    experience: number;
+    mainLanguage: string;
+    qualification: string;
+    about: string;
+    mainIncome: string;
+    weeklyHours: number;
+    rate: number;
+    twitter?: string;
+    linkedin?: string;
+    youtube?: string;
+    facebook?: string;
+    categories: string[];
+  }, token?: string): Promise<ApiResponse<any>> {
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return this.makeRequest('/api/mentor/apply', {
+      method: 'POST',
+      body: JSON.stringify(mentorData),
+      headers,
+    });
+  }
+
+  /**
    * POST /api/mentor/login - Mentor login
    */
   static async loginMentor(loginData: {
@@ -1126,7 +1187,7 @@ export class ApiService {
   static async testConnection(): Promise<ApiResponse<string>> {
     try {
       console.log('=== API CONNECTION TEST ===');
-      console.log('Base URL being used:', this.getBaseUrl());
+      // console.log('Base URL being used:', this.getBaseUrl());
       
       // Test with a simple fetch first
       const url = `${this.baseUrl}/api/hello`;

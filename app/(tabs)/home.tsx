@@ -19,6 +19,7 @@ import { WalletService } from '../../services/WalletService';
 import { generateVideoRoomName, generateSessionId } from '../../utils/roomNameGenerator';
 import PermissionRequest from '../../components/PermissionRequest';
 import AppHeader from '../../components/AppHeader';
+import { logger } from '@/utils/Logger';
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,6 +28,7 @@ export default function HomeScreen() {
   const [services, setServices] = useState<any[]>([]);
   const [filteredServices, setFilteredServices] = useState<any[]>([]);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [mentorStatus, setMentorStatus] = useState<any>(null);
   const { user } = useUser();
 
   // Get user's first name for greeting
@@ -35,7 +37,41 @@ export default function HomeScreen() {
   useEffect(() => {
     loadAstrologers();
     loadCategories();
+    fetchMentorStatus();
   }, []);
+
+  const fetchMentorStatus = async () => {
+    try {
+      if (!user?.id) {
+        console.log('⚠️ User ID not available');
+        return;
+      }
+
+      console.log('🔍 Fetching mentor status for user:', user.id);
+      const response = await fetch(
+        `http://3.108.112.130:3000/api/mentor/user/${user.id}`,
+        {
+          method: 'GET',
+          headers: { accept: 'application/hal+json' },
+        }
+      );
+
+      if (!response.ok) {
+        console.log('⚠️ Mentor status not found (user may not be a mentor)');
+        setMentorStatus(null);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('✅ Mentor status fetched:', data.status);
+      setMentorStatus(data?.status);
+    } catch (error) {
+      console.error('❌ Error fetching mentor status:', error);
+      setMentorStatus(null);
+    }
+  };
+
+  
 
   const loadAstrologers = async () => {
     setLoading(true);
@@ -351,7 +387,13 @@ export default function HomeScreen() {
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={() => router.push('/become-mentor' as any)}
+            onPress={() => {
+              if (mentorStatus === 'INACTIVE') {
+                router.push('/mentor/pending-status' as any);
+              } else if (mentorStatus === null) {
+                router.push('/become-mentor' as any);
+              }
+            }}
           >
             <Ionicons name="people-circle-outline" size={28} color="#333" />
             <Text style={styles.actionButtonText}>Become Mentor</Text>

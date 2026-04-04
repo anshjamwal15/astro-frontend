@@ -170,7 +170,7 @@ export default function BecomeMentorScreen() {
           <View style={styles.ctaSection}>
             <TouchableOpacity
               style={styles.primaryCta}
-              onPress={() => router.push('/auth/mentor-signup' as any)}
+              onPress={() => router.push('/mentor-registration' as any)}
               activeOpacity={0.85}
             >
               <LinearGradient colors={['#0052CC', '#0066FF']} style={styles.primaryCtaGradient}>

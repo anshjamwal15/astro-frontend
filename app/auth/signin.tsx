@@ -106,28 +106,6 @@ export default function SignInScreen() {
     }
   };
 
-  const handleMentorSignIn = () => {
-    console.log('🚀 Navigating to mentor signin...');
-    router.push('/auth/mentor-signin' as any);
-  };
-
-  const handleSkip = () => {
-    console.log('Skip button clicked');
-    router.replace('/(tabs)/home');
-  };
-
-  const handleTruecallerSignIn = async () => {
-    setLoading(true);
-    try {
-      Alert.alert('Coming Soon', 'Truecaller authentication will be available soon!');
-    } catch (error: any) {
-      console.error('Truecaller signin error:', error);
-      Alert.alert('Error', error.message || 'Failed to sign in with Truecaller');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const updateFormData = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };

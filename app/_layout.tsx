@@ -62,6 +62,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="mentor" />
             <Stack.Screen name="become-mentor" />
+            <Stack.Screen name="mentor-registration" />
             <Stack.Screen name="chatbox" />
             <Stack.Screen name="video-room" />
             <Stack.Screen name="video-call-screen" />
