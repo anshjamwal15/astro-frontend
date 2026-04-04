@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -18,7 +19,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../contexts/UserContext';
 import { ChatService, ChatMessage } from '../services/chatService';
 import { BillingTimerService } from '../services/BillingTimerService';
-import { logger } from '@/utils/Logger';
 
 interface Message {
   id: string;
@@ -322,10 +322,12 @@ export default function ChatBoxScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" translucent={false} />
       {/* Header */}
       <LinearGradient
         colors={['#4CAF50', '#45A049']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -342,7 +344,7 @@ export default function ChatBoxScreen() {
                   ]
                 );
               } else {
-                router.back();
+                router.replace("/home");
               }
             }}
           >
@@ -351,10 +353,16 @@ export default function ChatBoxScreen() {
 
           <View style={styles.astrologerInfo}>
             <View style={styles.astrologerImageContainer}>
-              <Image
-                source={{ uri: astrologerImage as string }}
-                style={styles.astrologerImage}
-              />
+              {astrologerImage ? (
+                <Image
+                  source={{ uri: astrologerImage as string }}
+                  style={styles.astrologerImage}
+                />
+              ) : (
+                <View style={[styles.astrologerImage, styles.defaultAvatarContainer]}>
+                  <Ionicons name="person" size={28} color="#FFFFFF" />
+                </View>
+              )}
               {isOnline === 'true' && <View style={styles.onlineIndicator} />}
             </View>
             <View style={styles.astrologerDetails}>
@@ -367,23 +375,10 @@ export default function ChatBoxScreen() {
               <Text style={styles.onlineStatus}>
                 {/* {isOnline === 'true' ? 'Online' : 'Offline'} */} {/* TODO: add online status from server side first */}
               </Text>
-              {sessionActive && (
-                <View style={styles.timerPill}>
-                  <View style={styles.timerDot} />
-                  <Text style={styles.timerText}>{formatDuration(chatDuration)}</Text>
-                  <Text style={styles.timerBilling}> • ₹{ratePerMinute}/min • ₹{currentBalance.toFixed(0)} left</Text>
-                </View>
-              )}
             </View>
           </View>
 
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleCallPress}>
-              <Ionicons name="call" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={handleVideoCallPress}>
-              <Ionicons name="videocam" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionButton}
               onPress={refreshMessages}
@@ -399,9 +394,6 @@ export default function ChatBoxScreen() {
                 <Ionicons name="close" size={16} color="#FFFFFF" />
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.actionButton}>
-              <Ionicons name="ellipsis-vertical" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
           </View>
         </View>
       </LinearGradient>
@@ -426,67 +418,95 @@ export default function ChatBoxScreen() {
         ref={scrollViewRef}
         style={styles.messagesContainer}
         showsVerticalScrollIndicator={false}
+        scrollIndicatorInsets={{ right: 1 }}
       >
-        {messages.map((message) => (
-          <View
-            key={message.id}
-            style={[
-              styles.messageContainer,
-              message.isUser ? styles.userMessageContainer : styles.astrologerMessageContainer
-            ]}
-          >
-            {!message.isUser && (
-              <Image
-                source={{ uri: astrologerImage as string }}
-                style={styles.messageAvatar}
-              />
-            )}
-            <View
-              style={[
-                styles.messageBubble,
-                message.isUser ? styles.userMessageBubble : styles.astrologerMessageBubble
-              ]}
-            >
-              <Text
-                style={[
-                  styles.messageText,
-                  message.isUser ? styles.userMessageText : styles.astrologerMessageText
-                ]}
-              >
-                {message.content}
-              </Text>
-              <Text
-                style={[
-                  styles.messageTime,
-                  message.isUser ? styles.userMessageTime : styles.astrologerMessageTime
-                ]}
-              >
-                {formatTime(message.createdAt)}
-              </Text>
+        {sessionActive && (
+          <View style={styles.timerContainer}>
+            <View style={styles.timerPill}>
+              <View style={styles.timerDot} />
+              <Text style={styles.timerText}>{formatDuration(chatDuration)}</Text>
+              <Text style={styles.timerBilling}> • ₹{ratePerMinute}/min • ₹{currentBalance.toFixed(0)} left</Text>
             </View>
           </View>
-        ))}
+        )}
+        {messages.length === 0 ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 }}>
+            <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
+            <Text style={{ fontSize: 16, color: '#9CA3AF', marginTop: 12, fontWeight: '500' }}>
+              No messages yet
+            </Text>
+            <Text style={{ fontSize: 13, color: '#D1D5DB', marginTop: 4 }}>
+              Start the conversation
+            </Text>
+          </View>
+        ) : (
+          messages.map((message) => (
+            <View
+              key={message.id}
+              style={[
+                styles.messageContainer,
+                message.isUser ? styles.userMessageContainer : styles.astrologerMessageContainer
+              ]}
+            >
+              {!message.isUser && (
+                astrologerImage ? (
+                  <Image
+                    source={{ uri: astrologerImage as string }}
+                    style={styles.messageAvatar}
+                  />
+                ) : (
+                  <View style={[styles.messageAvatar, styles.defaultMessageAvatarContainer]}>
+                    <Ionicons name="person" size={16} color="#FFFFFF" />
+                  </View>
+                )
+              )}
+              <View
+                style={[
+                  styles.messageBubble,
+                  message.isUser ? styles.userMessageBubble : styles.astrologerMessageBubble
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.messageText,
+                    message.isUser ? styles.userMessageText : styles.astrologerMessageText
+                  ]}
+                >
+                  {message.content}
+                </Text>
+                <Text
+                  style={[
+                    styles.messageTime,
+                    message.isUser ? styles.userMessageTime : styles.astrologerMessageTime
+                  ]}
+                >
+                  {formatTime(message.createdAt)}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
       </ScrollView>
 
       {/* Input Area */}
       <View style={styles.inputContainer}>
         <View style={styles.inputWrapper}>
-          <TouchableOpacity style={styles.attachButton}>
-            <Ionicons name="attach" size={20} color="#666" />
+          <TouchableOpacity style={styles.attachButton} activeOpacity={0.6}>
+            <Ionicons name="attach" size={18} color="#6B7280" />
           </TouchableOpacity>
 
           <TextInput
             style={styles.textInput}
             value={inputText}
             onChangeText={setInputText}
-            placeholder="Type your message..."
-            placeholderTextColor="#999"
+            placeholder="Type a message..."
+            placeholderTextColor="#9CA3AF"
             multiline
             maxLength={500}
           />
 
-          <TouchableOpacity style={styles.emojiButton}>
-            <Ionicons name="happy" size={20} color="#666" />
+          <TouchableOpacity style={styles.emojiButton} activeOpacity={0.6}>
+            <Ionicons name="happy" size={18} color="#6B7280" />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -496,6 +516,7 @@ export default function ChatBoxScreen() {
             ]}
             onPress={sendMessage}
             disabled={!inputText.trim()}
+            activeOpacity={0.8}
           >
             <Ionicons name="send" size={16} color="#FFFFFF" />
           </TouchableOpacity>
@@ -508,12 +529,12 @@ export default function ChatBoxScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FAFAFA',
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 15,
-    paddingHorizontal: 15,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
   },
   headerContent: {
     flexDirection: 'row',
@@ -524,7 +545,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -532,37 +553,43 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 15,
+    marginLeft: 12,
   },
   astrologerImageContainer: {
     position: 'relative',
     marginRight: 12,
   },
   astrologerImage: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    borderWidth: 2,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2.5,
     borderColor: '#FFFFFF',
+  },
+  defaultAvatarContainer: {
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   onlineIndicator: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
+    bottom: 0,
+    right: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#10B981',
+    borderWidth: 3,
     borderColor: '#FFFFFF',
   },
   astrologerDetails: {
     flex: 1,
   },
   astrologerName: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
   roomNameLabel: {
     fontSize: 12,
@@ -571,7 +598,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   onlineStatus: {
-    fontSize: 14,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.8)',
   },
   billingInfo: {
@@ -583,70 +610,76 @@ const styles = StyleSheet.create({
   timerPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginTop: 4,
-    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
   },
   timerDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#ff3b30',
-    marginRight: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF4757',
+    marginRight: 6,
   },
   timerText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#000000',
   },
   timerBilling: {
     fontSize: 11,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.85)',
+    color: '#000000',
   },
   endChatButton: {
-    backgroundColor: 'rgba(255, 68, 68, 0.8)',
+    backgroundColor: 'rgba(239, 68, 68, 0.85)',
   },
   lowBalanceWarning: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: '#FEF3C7',
     borderBottomWidth: 1,
-    borderBottomColor: '#fde68a',
+    borderBottomColor: '#FCD34D',
   },
   warningContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   warningText: {
     flex: 1,
-    color: '#92400e',
-    fontSize: 14,
+    color: '#92400E',
+    fontSize: 13,
     fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: 10,
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   actionButton: {
-    width: 35,
-    height: 35,
-    borderRadius: 17.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   messagesContainer: {
     flex: 1,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  timerContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginBottom: 8,
   },
   messageContainer: {
     flexDirection: 'row',
-    marginBottom: 15,
+    marginBottom: 12,
     alignItems: 'flex-end',
   },
   userMessageContainer: {
@@ -656,84 +689,96 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   messageAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     marginRight: 8,
   },
+  defaultMessageAvatarContainer: {
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   messageBubble: {
-    maxWidth: '75%',
-    paddingHorizontal: 15,
+    maxWidth: '78%',
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 20,
+    borderRadius: 18,
   },
   userMessageBubble: {
     backgroundColor: '#4CAF50',
-    borderBottomRightRadius: 5,
+    borderBottomRightRadius: 4,
   },
   astrologerMessageBubble: {
     backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 5,
+    borderBottomLeftRadius: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 2,
   },
   messageText: {
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 20,
+    letterSpacing: 0.2,
   },
   userMessageText: {
     color: '#FFFFFF',
+    fontWeight: '500',
   },
   astrologerMessageText: {
-    color: '#333',
+    color: '#1F2937',
   },
   messageTime: {
-    fontSize: 12,
-    marginTop: 5,
+    fontSize: 11,
+    marginTop: 4,
   },
   userMessageTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.75)',
     textAlign: 'right',
   },
   astrologerMessageTime: {
-    color: '#999',
+    color: '#9CA3AF',
   },
   inputContainer: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: '#E5E7EB',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#F8F8F8',
-    borderRadius: 25,
-    paddingHorizontal: 15,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 24,
+    paddingHorizontal: 14,
     paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   attachButton: {
-    marginRight: 10,
+    marginRight: 8,
+    padding: 4,
   },
   textInput: {
     flex: 1,
-    fontSize: 16,
-    color: '#333',
+    fontSize: 15,
+    color: '#1F2937',
     maxHeight: 100,
-    paddingVertical: 5,
+    paddingVertical: 6,
+    fontWeight: '500',
   },
   emojiButton: {
-    marginLeft: 10,
-    marginRight: 10,
+    marginLeft: 8,
+    marginRight: 8,
+    padding: 4,
   },
   sendButton: {
-    width: 35,
-    height: 35,
-    borderRadius: 17.5,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -741,7 +786,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
   },
   sendButtonInactive: {
-    backgroundColor: '#CCC',
+    backgroundColor: '#D1D5DB',
   },
   loadingContainer: {
     justifyContent: 'center',
@@ -749,6 +794,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: '#6B7280',
+    fontWeight: '500',
   },
 });
