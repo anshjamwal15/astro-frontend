@@ -404,7 +404,7 @@ export default function HomeScreen() {
             onPress={() => router.push('/video-room')}
           >
             <Ionicons name="videocam" size={24} color="#FFFFFF" />
-            <Text style={[styles.actionButtonText, styles.videoRoomButtonText]}>Join Video Room</Text>
+            <Text style={[styles.actionButtonText, styles.videoRoomButtonText]}>Join Room</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

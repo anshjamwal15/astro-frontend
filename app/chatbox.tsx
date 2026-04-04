@@ -270,7 +270,23 @@ export default function ChatBoxScreen() {
         ? `Chat cancelled.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}\nRemaining Balance: ₹${summary.remainingBalance.toFixed(2)}`
         : `Chat ended.\n\nDuration: ${summary.totalMinutes} minute${summary.totalMinutes !== 1 ? 's' : ''}\nTotal Cost: ₹${summary.totalCost.toFixed(2)}\nRemaining Balance: ₹${summary.remainingBalance.toFixed(2)}`;
 
-    Alert.alert('Chat Summary', message, [{ text: 'OK', onPress: () => router.back() }]);
+    Alert.alert('Chat Summary', message, [
+      {
+        text: 'OK',
+        onPress: () => {
+          // Navigate to mentor review screen
+          router.push({
+            pathname: '/mentor-review',
+            params: {
+              mentorId: astrologerId,
+              mentorName: astrologerName || 'Mentor',
+              callId: sessionId,
+              callType: 'chat',
+            },
+          });
+        },
+      },
+    ]);
   };
 
   const handleCallPress = async () => {

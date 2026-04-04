@@ -245,7 +245,16 @@ export default function VideoCallScreen() {
         Alert.alert('Call Summary', message, [
           { text: 'OK', onPress: () => {
             webRTCService.endCall();
-            router.back();
+            // Navigate to mentor review screen
+            router.push({
+              pathname: '/mentor-review',
+              params: {
+                mentorId,
+                mentorName: params.mentorName || 'Mentor',
+                callId: sessionId,
+                callType: 'video',
+              },
+            });
           }}
         ]);
       } else {

@@ -67,6 +67,13 @@ export default function RootLayout() {
             <Stack.Screen name="video-room" />
             <Stack.Screen name="video-call-screen" />
             <Stack.Screen name="otp-verification" />
+            <Stack.Screen 
+              name="mentor-review" 
+              options={{
+                presentation: 'modal',
+                animationEnabled: true,
+              }}
+            />
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>
