@@ -12,9 +12,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  BackHandler,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useUser } from '../../contexts/UserContext';
 import { AuthService } from '../../services/authService';
 import { DeviceTokenService } from '../../services/deviceTokenService';
@@ -34,6 +35,19 @@ export default function SignInScreen() {
     const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
     return () => { show.remove(); hide.remove(); };
   }, []);
+
+  // Prevent back button navigation on signin screen
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        // Return true to prevent default back behavior
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [])
+  );
 
   const handleSignIn = async () => {
     console.log('🚀 Starting signin process...');
