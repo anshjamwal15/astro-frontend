@@ -2,6 +2,7 @@ import Expo
 import FirebaseCore
 import React
 import ReactAppDependencyProvider
+import WebRTC
 
 @UIApplicationMain
 public class AppDelegate: ExpoAppDelegate {
@@ -27,6 +28,8 @@ public class AppDelegate: ExpoAppDelegate {
 // @generated begin @react-native-firebase/app-didFinishLaunchingWithOptions - expo prebuild (DO NOT MODIFY) sync-10e8520570672fd76b2403b7e1e27f5198a6349a
 FirebaseApp.configure()
 // @generated end @react-native-firebase/app-didFinishLaunchingWithOptions
+    RTCSetMinDebugLogLevel(.info)
+    WebRTCModuleOptions.sharedInstance().enableMultitaskingCameraAccess = true
     factory.startReactNative(
       withModuleName: "main",
       in: window,
