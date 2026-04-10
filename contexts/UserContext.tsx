@@ -7,7 +7,7 @@ export interface User {
   email: string;
   mobile?: string;
   country?: string;
-  dateOfBirth?: string;
+  dateOfBirth?: string; // ISO 8601 format (YYYY-MM-DD)
   currentAddress?: string | null;
   pincode?: string | null;
   gender?: string | null;

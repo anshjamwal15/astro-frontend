@@ -76,13 +76,21 @@ export default function SignInScreen() {
       const userData = await AuthService.loginWithEmail(formData.email, formData.password);
       console.log('✅ Login successful:', userData);
       
+      // Convert dateOfBirth from array [year, month, day] to ISO string (YYYY-MM-DD)
+      let dateOfBirthString: string | undefined;
+      if (userData.dateOfBirth && Array.isArray(userData.dateOfBirth)) {
+        const [year, month, day] = userData.dateOfBirth;
+        dateOfBirthString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+
       // Set user data in context
-      await setUser({
+      setUser({
         id: userData.id,
         name: userData.name,
         email: userData.email,
         mobile: userData.mobile,
         country: userData.country,
+        dateOfBirth: dateOfBirthString,
         userType: userData.userType || 'CUSTOMER',
         profileCompleted: userData.profileCompleted || false,
         isMentor: userData.isMentor ?? false,
@@ -90,7 +98,7 @@ export default function SignInScreen() {
 
       // Save JWT token
       if (userData.jwtToken) {
-        await setJwtToken(userData.jwtToken);
+        setJwtToken(userData.jwtToken);
         console.log('✅ JWT token saved');
       }
 
@@ -226,6 +234,15 @@ export default function SignInScreen() {
             ) : (
               <Text style={styles.signInButtonText}>SIGN IN</Text>
             )}
+          </TouchableOpacity>
+
+          {/* Sign In with OTP Button */}
+          <TouchableOpacity 
+            style={styles.otpButton}
+            onPress={() => router.push('/auth/signin-otp' as any)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.otpButtonText}>SIGN IN WITH OTP</Text>
           </TouchableOpacity>
 
           {/* Sign In as Mentor Button */}
@@ -428,6 +445,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  otpButton: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 25,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginBottom: 30,
+    borderWidth: 2,
+    borderColor: '#0052CC',
+  },
+  otpButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0052CC',
   },
   mentorSignInButton: {
     backgroundColor: '#E8F5E8',

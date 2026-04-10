@@ -407,14 +407,12 @@ export class AuthService {
       const requestBody: Record<string, any> = {
         name: userData.name,
         email: userData.email,
-        mobile: userData.mobile || '9876543210',
+        mobile: userData.mobile || '',
         country: userData.country || 'IN',
         password: userData.password,
-        method: 'password', // Use 'password' as per API doc
+        method: 'password',
+        dateOfBirth: userData.dateOfBirth
       };
-      if (userData.dateOfBirth) {
-        requestBody.date_of_birth = userData.dateOfBirth;
-      }
 
       console.log('Registration request body:', requestBody);
 
@@ -517,27 +515,93 @@ export class AuthService {
     }
   }
 
-  // Helper method to calculate zodiac sign
-  private static calculateZodiacSign(dateOfBirth: string): string {
-    if (!dateOfBirth) return 'Unknown';
-    
-    const date = new Date(dateOfBirth);
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    
-    if ((month == 3 && day >= 21) || (month == 4 && day <= 19)) return 'Aries';
-    if ((month == 4 && day >= 20) || (month == 5 && day <= 20)) return 'Taurus';
-    if ((month == 5 && day >= 21) || (month == 6 && day <= 20)) return 'Gemini';
-    if ((month == 6 && day >= 21) || (month == 7 && day <= 22)) return 'Cancer';
-    if ((month == 7 && day >= 23) || (month == 8 && day <= 22)) return 'Leo';
-    if ((month == 8 && day >= 23) || (month == 9 && day <= 22)) return 'Virgo';
-    if ((month == 9 && day >= 23) || (month == 10 && day <= 22)) return 'Libra';
-    if ((month == 10 && day >= 23) || (month == 11 && day <= 21)) return 'Scorpio';
-    if ((month == 11 && day >= 22) || (month == 12 && day <= 21)) return 'Sagittarius';
-    if ((month == 12 && day >= 22) || (month == 1 && day <= 19)) return 'Capricorn';
-    if ((month == 1 && day >= 20) || (month == 2 && day <= 18)) return 'Aquarius';
-    if ((month == 2 && day >= 19) || (month == 3 && day <= 20)) return 'Pisces';
-    
-    return 'Unknown';
+  // Send OTP to mobile or email
+  static async sendOTP(mobileOrEmail: string, otpType: 'mobile' | 'email' = 'mobile'): Promise<any> {
+    try {
+      const countryCode = '91'; // Default to India
+      
+      const payload = {
+        mobileOrEmail,
+        countryCode,
+        otpType,
+      };
+
+      const response = await this.makeApiRequest(
+        `${AUTH_CONFIG.API.BASE_URL}/api/otp/send`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'accept': 'application/hal+json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send OTP');
+      }
+
+      const data = await response.json();
+      console.log('✅ OTP sent successfully');
+      return data;
+    } catch (error: any) {
+      console.error('❌ Error sending OTP:', error);
+      throw new Error(error.message || 'Failed to send OTP. Please try again.');
+    }
   }
+
+  // Verify OTP and sign in
+  static async verifyOTP(mobileOrEmail: string, otp: string, countryCode: string = '91', otpType: 'mobile' | 'email' = 'mobile'): Promise<any> {
+    try {
+      const payload = {
+        mobileOrEmail,
+        countryCode,
+        otpType,
+        otp,
+      };
+
+      const response = await this.makeApiRequest(
+        `${AUTH_CONFIG.API.BASE_URL}/api/otp/verify`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'accept': 'application/hal+json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Invalid OTP');
+      }
+
+      const data = await response.json();
+      console.log('✅ OTP verified successfully');
+      
+      // Map the response to match expected user format
+      return {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        mobile: data.mobile,
+        country: data.country,
+        dateOfBirth: data.dateOfBirth,
+        currentAddress: data.currentAddress,
+        pincode: data.pincode,
+        gender: data.gender,
+        userType: data.userType || 'CUSTOMER',
+        profileCompleted: data.profileCompleted || false,
+        jwtToken: data.jwtToken,
+        isMentor: data.isMentor ?? false,
+      };
+    } catch (error: any) {
+      console.error('❌ Error verifying OTP:', error);
+      throw new Error(error.message || 'Invalid OTP. Please try again.');
+    }
+  }
+
 }

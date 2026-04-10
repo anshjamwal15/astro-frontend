@@ -112,21 +112,28 @@ export default function SignUpScreen() {
 
       console.log('✅ Registration successful:', userData);
 
+      // Convert dateOfBirth from array [year, month, day] to ISO string (YYYY-MM-DD)
+      let dateOfBirthString: string | undefined;
+      if (userData.dateOfBirth && Array.isArray(userData.dateOfBirth)) {
+        const [year, month, day] = userData.dateOfBirth;
+        dateOfBirthString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+
       // Set user data in context
-      await setUser({
+      setUser({
         id: userData.id,
         name: userData.name,
         email: userData.email,
         mobile: userData.mobile,
         country: userData.country,
+        dateOfBirth: dateOfBirthString,
         userType: userData.userType || 'CUSTOMER',
         profileCompleted: userData.profileCompleted || false,
-        dateOfBirth: userData.dateOfBirth,
       });
 
       // Save JWT token
       if (userData.jwtToken) {
-        await setJwtToken(userData.jwtToken);
+        setJwtToken(userData.jwtToken);
         console.log('✅ JWT token saved');
       }
 
