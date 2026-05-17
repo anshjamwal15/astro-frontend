@@ -262,9 +262,9 @@ export default function WalletScreen() {
                     <Text style={styles.transactionType}>
                       {transaction.transactionType || 'Transaction'}
                     </Text>
-                    <Text style={styles.transactionDate}>
+                    {/* <Text style={styles.transactionDate}>
                       {formatDate(transaction.createdAt)}
-                    </Text>
+                    </Text> */}
                     {transaction.paymentGatewayReference && (
                       <Text style={styles.transactionRef}>
                         Ref: {transaction.paymentGatewayReference}

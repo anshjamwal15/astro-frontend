@@ -184,14 +184,14 @@ export class CallNotificationService {
 
       const mentor = await response.json();
 
-      if (!mentor.device_token) {
+      if (!mentor.deviceToken) {
         console.warn(`⚠️ Mentor ${mentor.name} (${mentorId}) has no device token registered`);
         return null;
       }
 
       console.log(`✅ Found device token for mentor ${mentor.name} (${mentorId})`);
-      console.log(`📱 Device token: ${mentor.device_token.substring(0, 50)}...`);
-      return mentor.device_token;
+      console.log(`📱 Device token: ${mentor.deviceToken.substring(0, 50)}...`);
+      return mentor.deviceToken;
     } catch (error: any) {
       console.error('❌ Error getting device token:', error);
       return null;
